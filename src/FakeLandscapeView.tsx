@@ -36,12 +36,15 @@ export function FakeLandscapeView({ orientationMode, p1OnRight, upsideDown, styl
 
   return (
     <View style={StyleSheet.absoluteFill} pointerEvents='box-none'>
-      <View style={[style, { height: width, left: (width - height) / 2, position: 'absolute', top: (height - width) / 2, transform: [{ rotate: `${rotation}deg` }], width: height }]}>{children}</View>
+      <View style={[style, styles.absolute, { height: width, left: (width - height) / 2, top: (height - width) / 2, transform: [{ rotate: `${rotation}deg` }], width: height }]}>{children}</View>
     </View>
   )
 }
 
 const styles = StyleSheet.create({
+  absolute: {
+    position: 'absolute'
+  },
   flip180: {
     transform: [{ rotate: '180deg' }]
   }
