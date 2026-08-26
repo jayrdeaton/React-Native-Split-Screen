@@ -68,11 +68,14 @@ Enforced by ESLint + Prettier — run the linter before finishing any task.
 
 | File | Purpose |
 |---|---|
-| `useDeviceOrientation.ts` | `'faceToFace' \| 'sideBySide'` from `useWindowDimensions` — follows the device's live physical shape, not a stored preference. |
-| `useP1OnRight.ts` | Which physical side (left/right) P1 lands on once in side-by-side mode — needs the real `LANDSCAPE_LEFT`/`LANDSCAPE_RIGHT` reading from `expo-screen-orientation`, since `useDeviceOrientation` alone can only tell you *some* landscape, not which rotation direction got you there. |
-| `useOrientationLock.ts` | Opt-in native orientation lock, pinned to whichever `OrientationMode` is passed in. |
+| `types.ts` | `OrientationMode` (`'faceToFace' \| 'sideBySide'`) — split into its own file since it's shared by `useAccelerometerOrientation.tsx` and `useDualZoneLayout.ts` and neither should import from the other. |
+| `useAccelerometerOrientation.tsx` | `orientationMode`/`p1OnRight`/`upsideDown`, derived from the device's own physical tilt via `expo-sensors`' `DeviceMotion` rather than `useWindowDimensions`/`expo-screen-orientation` — works even when the consuming app is permanently locked to portrait at the OS level, since there's no live window-shape signal left to read otherwise. Debounces against brief jolts (e.g. a swipe) and simply holds its last committed value once the phone goes flat/ambiguous (gravity gives no signal about in-plane rotation there at all). `locked` freezes all three fields at whatever they last committed — the same job the old `useOrientationLock`'s `enabled` flag did, just local to this hook now instead of a native call. `AccelerometerOrientationProvider` hoists the actual sensor subscription to one app-lifetime instance (mount once, near the root) so the committed reading survives screen navigation; `useAccelerometerOrientation` reads it via Context. `getAccelerometerOrientationSnapshot()` is a non-subscribing one-time read (e.g. to seed a lazy `useState` initializer) for a caller that must never re-render just because the phone moved — plain `useContext` can't do this, since subscribing at all re-renders the caller on every future update regardless of whether it goes on to use the new value. |
+| `rotation.ts` | `getViewRotation(orientationMode, p1OnRight, upsideDown)` — the raw rotation angle (0/90/180/-90) for single-perspective content (`FakeLandscapeView` reads this internally). `getFixedZoneRotation` is the same idea for a permanently fixed two-zone layout (e.g. a game board that never reflows): only a genuine landscape hold rotates anything; portrait's "upside down" flip is deliberately ignored, since the zones can't swap which physical seat they're nearest just by spinning while flat. `getOpposingZoneRotation` gives the *second* seat's own rotation from the first seat's — identical in landscape (both seats face the same way), +180°/-180° apart in portrait (the seats are face-to-face). |
+| `insets.ts` | `rotateInsets(insets, rotation)` — remaps `useSafeAreaInsets()`'s always-physical-frame values onto whichever edge they actually correspond to once content has visually rotated. |
+| `FakeLandscapeView.tsx` | Wraps whole-screen, single-perspective content in whatever rotation (via `getViewRotation`) keeps it gravity-upright — width/height swap for a genuine 90°/-90° hold, plain rotate for 180°. NOT safe for continuous gesture tracking (raw native coordinates don't rotate with it) — never wrap a game board/touch layer in this. |
 | `useDualZoneLayout.ts` | The committed (not live) layout state plus a Reanimated opacity style — fades out, swaps content, fades in across a rotation, rather than snapping instantly. Returns `panelLayout` so a caller can also size other things (e.g. a press-away zone rect) against the same painted state. |
-| `DualZoneLayout.tsx` | Renders `p1`/`p2`/`shared` in whichever arrangement `panelLayout` calls for — face-to-face (p2 rotated 180° and stacked) or side-by-side (plain left/right row) — driven by `useDualZoneLayout`'s state and fade style. Only covers the two-player case; a solo screen doesn't need this component. |
+| `DualZoneLayout.tsx` | Renders `p1`/`p2`/`shared` in whichever arrangement `panelLayout` calls for — face-to-face (p2 rotated 180° and stacked) or side-by-side (plain left/right row) — driven by `useDualZoneLayout`'s state and fade style. Only covers the two-player, reflowing case; a solo screen, or a board whose zones must stay fixed (see `rotation.ts`), doesn't need this component. |
+| `useZoneBounds.ts` | Context carrying the currently-rendered `DualZoneLayout` zone's own bounds/rotation state (`sharedEdgeY`, `zoneSide`, `rotated`) down to consumers inside it — e.g. `@tastic/hud` popovers that need to clamp against the shared row or account for a 180°-rotated zone's locally-inverted positioning. `null` outside a zone. |
 | `index.ts` | Public exports. |
 
 ### Why `useDualZoneLayout` and `DualZoneLayout` are split
@@ -87,7 +90,7 @@ the same `panelLayout` without the app re-deriving it twice.
 
 - `react`, `react-native`
 - `react-native-reanimated` ^4 — the fade transition (`useAnimatedReaction`, `withTiming`, shared values)
-- `expo-screen-orientation` ^57 — real landscape-left/right reading, native orientation lock
+- `expo-sensors` ^57 — `DeviceMotion` tilt reading
 
 No `react-native-gesture-handler`, no `react-native-paper`.
 
@@ -95,6 +98,6 @@ No `react-native-gesture-handler`, no `react-native-paper`.
 
 - **Framework:** Jest + ts-jest + `@testing-library/react` (jsdom environment)
 - **Location:** `src/__tests__/*.test.ts`
-- **Mocks:** `src/__mocks__/` — `react-native`, `react-native-reanimated`, `expo-screen-orientation`
-- Tests cover the state hook (`useDualZoneLayout`) — component rendering is not tested
-- When adding new hook behavior, add a corresponding test case
+- **Mocks:** `src/__mocks__/` — `react-native`, `react-native-reanimated`, `expo-sensors`
+- Tests cover the state hooks (`useAccelerometerOrientation`, `useDualZoneLayout`) and the pure rotation/insets math (`rotation.ts`, `insets.ts`) — component rendering is not tested
+- When adding new hook or rotation-math behavior, add a corresponding test case

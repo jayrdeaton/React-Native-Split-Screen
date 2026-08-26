@@ -6,7 +6,7 @@ module.exports = {
   moduleNameMapper: {
     '^react-native$': '<rootDir>/src/__mocks__/react-native.ts',
     '^react-native-reanimated$': '<rootDir>/src/__mocks__/react-native-reanimated.ts',
-    '^expo-screen-orientation$': '<rootDir>/src/__mocks__/expo-screen-orientation.ts'
+    '^expo-sensors$': '<rootDir>/src/__mocks__/expo-sensors.ts'
   },
   transform: {
     '^.+\\.tsx?$': [

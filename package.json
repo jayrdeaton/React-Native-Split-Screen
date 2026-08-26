@@ -69,7 +69,7 @@
     "eslint-plugin-prettier": "^5.5.5",
     "eslint-plugin-react-native": "^5.0.0",
     "eslint-plugin-simple-import-sort": "^13.0.0",
-    "expo-screen-orientation": "^57.0.1",
+    "expo-sensors": "~57.0.2",
     "jest": "^30.4.2",
     "jest-environment-jsdom": "^30.4.1",
     "prettier": "^3.8.3",
@@ -83,7 +83,7 @@
     "typescript-eslint": "^8.59.3"
   },
   "peerDependencies": {
-    "expo-screen-orientation": ">=57.0.0",
+    "expo-sensors": ">=57.0.0",
     "react": ">=19.0.0",
     "react-native": ">=0.76.0",
     "react-native-reanimated": ">=4.0.0"
