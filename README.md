@@ -56,17 +56,17 @@ and never updates — the same "nothing crashes, it just never resolves" failure
 import { DualZoneLayout, useAccelerometerOrientation, useDualZoneLayout } from '@tastic/split-screen'
 
 function LobbyScreen() {
-  // orientationMode/p1OnRight are derived from the device's own physical tilt (via expo-sensors'
-  // DeviceMotion), not the OS's own rotation — this works even in an app permanently locked to
-  // portrait at the OS level, since there's no live window-shape signal left to read otherwise.
-  // `lockOrientationSetting` freezes both at whatever they last committed, the same job an app-level
-  // "Lock Orientation" preference toggle already wants.
-  const { orientationMode, p1OnRight, resolved } = useAccelerometerOrientation(lockOrientationSetting)
+  // orientationMode/p1OnRight/upsideDown are derived from the device's own physical tilt (via
+  // expo-sensors' DeviceMotion), not the OS's own rotation — this works even in an app permanently
+  // locked to portrait at the OS level, since there's no live window-shape signal left to read
+  // otherwise. `lockOrientationSetting` freezes all three at whatever they last committed, the same
+  // job an app-level "Lock Orientation" preference toggle already wants.
+  const { orientationMode, p1OnRight, upsideDown, resolved } = useAccelerometerOrientation(lockOrientationSetting)
 
   // panelLayout is the *committed* layout — lags one fade behind the live values above. Use it
   // (not the live orientationMode/p1OnRight) for anything else that needs to match what's actually
   // painted right now, mid-fade included — e.g. sizing a press-away zone (see @tastic/hud's README).
-  const { panelLayout, panelFadeStyle } = useDualZoneLayout(orientationMode, p1OnRight, resolved)
+  const { panelLayout, panelFadeStyle } = useDualZoneLayout(orientationMode, p1OnRight, resolved, upsideDown)
 
   return (
     <DualZoneLayout

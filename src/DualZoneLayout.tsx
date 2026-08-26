@@ -58,9 +58,17 @@ export function DualZoneLayout({ panelLayout, panelFadeStyle, p1, p2, shared }: 
   )
 
   if (isFaceToFace) {
-    // p2 (top, rotated) sits above the shared row; p1 (bottom, unrotated) sits below it.
-    const p2Bounds: ZoneBounds | null = sharedBounds && { rotated: true, sharedEdgeY: sharedBounds.top, zoneSide: 'aboveShared' }
-    const p1Bounds: ZoneBounds | null = sharedBounds && { rotated: false, sharedEdgeY: sharedBounds.bottom, zoneSide: 'belowShared' }
+    // p2 (top, rotated) sits above the shared row; p1 (bottom, unrotated) sits below it — that
+    // much never changes. But `rotated` below is XOR'd with panelLayout.upsideDown, not hardcoded
+    // per zone: the documented, intended use of upsideDown (see useDualZoneLayout's own doc) is a
+    // caller wrapping this whole component in a FakeLandscapeView driven by that same committed
+    // value, which adds a further 180° around EVERYTHING here in absolute terms once the device is
+    // upside down. p2's own 180° then cancels that outer one back to 0° absolute, and p1's 0° picks
+    // up the outer 180° it didn't have before — so without this, a popover relying on `rotated` for
+    // its own local-vs-real-world positioning (see useZoneBounds' own doc) would get both zones
+    // backwards the instant the caller's outer wrapper flips upside down.
+    const p2Bounds: ZoneBounds | null = sharedBounds && { rotated: !panelLayout.upsideDown, sharedEdgeY: sharedBounds.top, zoneSide: 'aboveShared' }
+    const p1Bounds: ZoneBounds | null = sharedBounds && { rotated: panelLayout.upsideDown, sharedEdgeY: sharedBounds.bottom, zoneSide: 'belowShared' }
 
     return (
       <View style={styles.dualZone}>

@@ -18,9 +18,14 @@ export interface ZoneBounds {
   // direction). `zoneSide` is what lets a caller tell which of the two directions it's looking at
   // for a given trigger before deciding whether sharedEdgeY applies at all.
   zoneSide: 'aboveShared' | 'belowShared'
-  // Whether this zone renders inside DualZoneLayout's 180° rotation (p2, in face-to-face mode
-  // only — neither zone rotates in side-by-side, and p1 never does). This matters for anything
-  // that positions itself with plain relative CSS against a trigger inside the zone (e.g.
+  // Whether this zone is rotated 180° in absolute, real-world terms — not just DualZoneLayout's own
+  // fixed internal flip (p2 in face-to-face mode, never p1, never either zone in side-by-side), but
+  // XOR'd against a caller's own enclosing FakeLandscapeView too, if it's rotating everything here a
+  // further 180° for an upside-down hold (see DualZoneLayout's own doc, and useDualZoneLayout's
+  // upsideDown) — that outer flip cancels p2's own 180° back to 0° absolute and adds one to p1's
+  // that it didn't have before, so both zones' true rotation swap once the device goes upside down.
+  // This matters for anything that positions itself with plain relative CSS against a trigger inside
+  // the zone (e.g.
   // @tastic/hud's PopoverBody, via `top:'100%'`/`bottom:'100%'`) rather than by an absolute
   // measured coordinate: that positioning is resolved in *local*, pre-rotation space and then
   // rotated along with everything else in the zone, which inverts it — local 'below' a trigger
