@@ -1,5 +1,5 @@
 import { DeviceMotion } from 'expo-sensors'
-import { createContext, ReactNode, useContext, useEffect, useRef, useState } from 'react'
+import { createContext, ReactNode, useContext, useEffect, useState } from 'react'
 import { Platform, useWindowDimensions } from 'react-native'
 
 import { OrientationMode } from './types'
@@ -104,16 +104,12 @@ function useAccelerometerOrientationSource(): AccelerometerOrientationState {
   const [state, setState] = useState<AccelerometerOrientationState>(DEFAULT_STATE)
 
   // Web has no accelerometer at all — falls back to exactly today's useWindowDimensions-based
-  // reading, unchanged, rather than trying to make DeviceMotion mean something there.
+  // reading, unchanged, rather than trying to make DeviceMotion mean something there. Computed
+  // directly during render (below, after the native effect) rather than mirrored into `state` via
+  // its own effect: it's already fully derived from webDimensions, so there's nothing to
+  // synchronize — and computing it inline also means web's first render is correct immediately,
+  // instead of one render of DEFAULT_STATE followed by an effect-driven correction.
   const webDimensions = useWindowDimensions()
-  useEffect(() => {
-    if (Platform.OS !== 'web') return
-    // No way to detect upside-down from window dimensions alone — web never needed it either,
-    // since the OS itself always handled real rotation there.
-    const next: AccelerometerOrientationState = { orientationMode: webDimensions.width > webDimensions.height ? 'sideBySide' : 'faceToFace', p1OnRight: true, upsideDown: false, resolved: true }
-    latestSnapshot = next
-    setState(next)
-  }, [webDimensions.width, webDimensions.height])
 
   useEffect(() => {
     if (Platform.OS === 'web') return
@@ -149,6 +145,14 @@ function useAccelerometerOrientationSource(): AccelerometerOrientationState {
     return () => subscription.remove()
     // Deliberately empty deps — this subscribes exactly once for the life of the Provider.
   }, [])
+
+  if (Platform.OS === 'web') {
+    // No way to detect upside-down from window dimensions alone — web never needed it either,
+    // since the OS itself always handled real rotation there.
+    const webState: AccelerometerOrientationState = { orientationMode: webDimensions.width > webDimensions.height ? 'sideBySide' : 'faceToFace', p1OnRight: true, upsideDown: false, resolved: true }
+    latestSnapshot = webState
+    return webState
+  }
 
   return state
 }
@@ -192,11 +196,14 @@ export function AccelerometerOrientationProvider({ children }: { children: React
 // consumer locked its own view of it.
 export function useAccelerometerOrientation(locked = false): AccelerometerOrientationState {
   const shared = useContext(AccelerometerOrientationContext)
-  // Kept fresh on every render where this call site isn't locked, so whenever `locked` flips to
-  // true, it freezes at whatever was current then rather than some stale earlier snapshot. Safe to
-  // mutate during render (not in an effect): it only ever needs to reflect this render's own
-  // inputs, and nothing reads it before this same render's return statement does.
-  const frozenRef = useRef(shared)
-  if (!locked) frozenRef.current = shared
-  return locked ? frozenRef.current : shared
+  // Kept in sync with `shared` on every render where this call site isn't locked, so whenever
+  // `locked` flips to true, it freezes at whatever was current then rather than some stale earlier
+  // snapshot. A ref would be simpler but isn't safe here — `frozen` is read as part of this same
+  // render's return value, and a ref mutated during render can end up holding a value from a
+  // render that never actually commits. Updating state directly in the render body (rather than in
+  // an effect) is the React-sanctioned way to keep a value in sync with something derived from
+  // render — see https://react.dev/learn/you-might-not-need-an-effect#adjusting-some-state-when-a-prop-changes.
+  const [frozen, setFrozen] = useState(shared)
+  if (!locked && frozen !== shared) setFrozen(shared)
+  return locked ? frozen : shared
 }

@@ -73,6 +73,16 @@ export function useDualZoneLayout(orientationMode: OrientationMode, p1OnRight: b
         runOnJS(setPanelLayout)({ orientationMode, p1OnRight, upsideDown })
         return
       }
+      // react-hooks/immutability flags this .value write as "modifying a value previously passed
+      // as an argument to a hook" (referring to panelOpacity showing up in commitPanelSwap's own
+      // useCallback deps above) — but mutating a shared value's .value from inside a reaction is
+      // exactly the API useSharedValue/useAnimatedReaction are designed around, and the same rule
+      // is satisfied by moving this same statement into a requestAnimationFrame callback (see
+      // commitPanelSwap), confirming it's losing track of the mutation once it crosses into an
+      // unrecognized callback rather than catching an actual bug. Deliberately not restructured
+      // just to dodge that gap — doing so would mean either delaying the fade-out start behind a
+      // rAF (an unjustified behavior change) or adding a callback purely to fool the linter.
+      // eslint-disable-next-line react-hooks/immutability
       panelOpacity.value = withTiming(0, { duration: fadeDurationMs }, (finished) => {
         if (finished) runOnJS(commitPanelSwap)(orientationMode, p1OnRight, upsideDown)
       })
