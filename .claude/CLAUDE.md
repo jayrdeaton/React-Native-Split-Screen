@@ -16,23 +16,39 @@ package depends on the other — they compose at the consuming app's own screen.
 ## Commands
 
 ```bash
-npm run lint      # ESLint + Prettier check
-npm run fix       # Auto-fix lint/format issues
-npm run typecheck # TypeScript type check (tsc --noEmit)
-npm test          # Run all Jest tests
-npm run build     # Compile to dist/
+npm run lint       # ESLint + Prettier check (@infinitetoken/eslint-config/react-native preset)
+npm run fix        # Auto-fix lint/format issues
+npm run typecheck  # TypeScript type check (tsc --noEmit)
+npm test           # Run all Jest tests
+npm run test:watch # Jest --watchAll
+npm run build      # tsup, config via tsup.config.cjs -> @infinitetoken/tsconfig/tsup/lib preset
+npm run build:watch
+npm run verify     # lint && test && typecheck && build — also runs via `preversion` (see Release)
 ```
 
 Always run `npm run lint` before finishing any task.
 
-## Publishing
+## Release
 
 ```bash
-npm version patch   # or minor / major — bumps version and creates git tag
-git push --follow-tags  # triggers the publish GitHub Action
+npm run release:patch   # or release:minor / release:major
 ```
 
-The publish workflow fires on `v*` tags and runs `npm publish` with provenance.
+Each `release:*` script runs `npm version <bump>` (bumps `package.json`, commits, creates a `vX.Y.Z`
+git tag) then `npm run release` (`git push --follow-tags`). `preversion` runs the full `verify` chain
+first, so a broken lint/test/typecheck/build blocks the version bump.
+
+Pushing the tag triggers the `publish` GitHub Action (`.github/workflows/publish.yml`, calling the
+shared `infinitetoken/Workflows/.github/workflows/npm-publish.yml@v1`), which runs `npm publish`.
+Both the caller and the reusable workflow grant only `contents: read` and `id-token: write` — no
+`--provenance` flag is ever passed to `npm publish` explicitly, but the live registry confirms
+provenance is attached anyway (`npm view @tastic/split-screen@0.2.1 dist` shows a
+`dist.attestations.provenance` entry with `predicateType: https://slsa.dev/provenance/v1`) — npm CLI
+auto-attaches provenance when it detects `id-token: write` in a supported CI environment (GitHub
+Actions), no flag needed. Published at https://www.npmjs.com/package/@tastic/split-screen (currently
+4 versions live: 0.1.0, 0.1.1, 0.2.0, 0.2.1, matching `package.json`'s current `0.2.1`). Only 3 git
+tags exist (`v0.1.1`, `v0.2.0`, `v0.2.1`) — `0.1.0` was published without a corresponding tag, before
+this release flow was in place.
 
 ## Local development (yalc)
 
@@ -86,18 +102,42 @@ currently on screen has to agree with the painted layout, mid-fade included, not
 orientation. Keeping the state hook separate from the render component is what lets both consume
 the same `panelLayout` without the app re-deriving it twice.
 
-### Peer dependencies
+## Public API
 
-- `react`, `react-native`
-- `react-native-reanimated` ^4 — the fade transition (`useAnimatedReaction`, `withTiming`, shared values)
-- `expo-sensors` ^57 — `DeviceMotion` tilt reading
+The complete `src/index.ts` export list:
+
+```ts
+export { DualZoneLayout } from './DualZoneLayout'
+export { FakeLandscapeView, type FakeLandscapeViewProps } from './FakeLandscapeView'
+export { type EdgeInsets, rotateInsets } from './insets'
+export { getFixedZoneRotation, getOpposingZoneRotation, getViewRotation, type ViewRotation } from './rotation'
+export { type OrientationMode } from './types'
+export { AccelerometerOrientationProvider, type AccelerometerOrientationState, getAccelerometerOrientationSnapshot, useAccelerometerOrientation } from './useAccelerometerOrientation'
+export { type DualZoneLayoutState, useDualZoneLayout } from './useDualZoneLayout'
+export { useZoneBounds, type ZoneBounds } from './useZoneBounds'
+```
+
+`ZoneBoundsProvider` (also exported from `useZoneBounds.ts`) is deliberately NOT re-exported here —
+it's an internal wiring detail `DualZoneLayout.tsx` imports directly; consumers only ever read bounds
+via `useZoneBounds`, never provide them.
+
+## Peer Dependencies
+
+- `react` >=19.0.0, `react-native` >=0.76.0
+- `react-native-reanimated` >=4.0.0 — the fade transition (`useAnimatedReaction`, `withTiming`, shared values)
+- `expo-sensors` >=57.0.0 — `DeviceMotion` tilt reading
 
 No `react-native-gesture-handler`, no `react-native-paper`.
 
 ## Testing
 
-- **Framework:** Jest + ts-jest + `@testing-library/react` (jsdom environment)
-- **Location:** `src/__tests__/*.test.ts`
+- **Framework:** Jest, configured through the shared `@infinitetoken/jest-config/react-native` preset
+  (jsdom environment; ts-jest transform under the hood, resolved transitively through the preset —
+  not a direct devDependency here) + `@testing-library/react`
+- **Location:** `src/__tests__/*.test.ts` and `*.test.tsx`
 - **Mocks:** `src/__mocks__/` — `react-native`, `react-native-reanimated`, `expo-sensors`
-- Tests cover the state hooks (`useAccelerometerOrientation`, `useDualZoneLayout`) and the pure rotation/insets math (`rotation.ts`, `insets.ts`) — component rendering is not tested
+- **Current:** 7 suites / 38 tests, all passing. Coverage: 92.9% stmts / 87.17% branches / 89.28% funcs
+  / 94.3% lines — clears the shared preset's 70%/70%/70%/70% default on every metric, so
+  `jest.config.cjs` carries no local `coverageThreshold` override
+- Tests cover the state hooks (`useAccelerometerOrientation`, `useDualZoneLayout`, `useZoneBounds`), the pure rotation/insets math (`rotation.ts`, `insets.ts`), and component rendering (`DualZoneLayout.tsx`, `FakeLandscapeView.tsx` — both now at 100%). Neither the mocked `View` nor the mocked `Animated.View` produces real host DOM elements, so these tests assert against props recorded on the `View` mock (`View.mock.calls`) and rendered text order/content rather than DOM structure. `src/__mocks__/react-native.ts`'s `View` stub also honors an incoming `ref` prop — React 19's ref-as-prop for a plain, non-`forwardRef` function component — handing back a fake `measureInWindow`, which is what lets `DualZoneLayout.test.tsx` exercise the post-measurement `ZoneBounds` branches instead of leaving them permanently unreachable
 - When adding new hook or rotation-math behavior, add a corresponding test case

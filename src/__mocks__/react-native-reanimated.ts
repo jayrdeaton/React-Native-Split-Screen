@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from 'react'
+import React, { useEffect, useRef, useState } from 'react'
 
 const identity = (x: any) => x
 
@@ -19,10 +19,9 @@ const notifyReactions = () => reactionRunners.forEach((run) => run())
 // useAnimatedReaction subscribers synchronously, mirroring how a worklet mutating .value on the
 // UI thread drives reactions in the real library.
 export const useSharedValue = (init: any) => {
-  const ref = useRef<{ value: any } | null>(null)
-  if (ref.current === null) {
+  const [shared] = useState(() => {
     let current = init
-    ref.current = {
+    return {
       get value() {
         return current
       },
@@ -31,8 +30,8 @@ export const useSharedValue = (init: any) => {
         notifyReactions()
       }
     }
-  }
-  return ref.current
+  })
+  return shared
 }
 export const useAnimatedStyle = (fn: () => any) => fn()
 export const useAnimatedReaction = (prepare: () => any, react: (curr: any, prev: any) => void) => {
