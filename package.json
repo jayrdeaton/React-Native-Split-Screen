@@ -1,6 +1,6 @@
 {
   "name": "@tastic/split-screen",
-  "version": "0.2.1",
+  "version": "0.2.2",
   "description": "Two-player split-screen layout engine for React Native games: device-orientation-aware zone splitting (face-to-face rotate-and-stack vs side-by-side row), which physical side each player lands on, and the fade transition between them",
   "keywords": [
     "react-native",
