@@ -1,3 +1,5 @@
+import { Platform } from 'react-native'
+
 import { OrientationMode } from './types'
 
 export type ViewRotation = 0 | 90 | 180 | -90
@@ -16,8 +18,18 @@ export type ViewRotation = 0 | 90 | 180 | -90
 // needed the OPPOSITE rotation from the first guess to read right-side-up — flip back here (not
 // there) if a future hardware change ever needs it, since p1OnRight's own left/right meaning was
 // separately confirmed correct on the same device.
+//
+// Web is excluded from sideBySide's own rotation entirely — that ±90° only exists to compensate for
+// a portrait-locked OS refusing to rotate its render surface for a physically-tilted device (see
+// this function's own top comment). A browser window has no such lock and no physical tilt to
+// compensate for: useAccelerometerOrientation's own web fallback picks sideBySide purely from the
+// window already being wider than tall, so the window is already the correct shape on its own —
+// applying the native compensating rotation on top would spin already-correctly-oriented content
+// sideways instead of fixing anything. upsideDown's own 180° needs no matching exclusion: web's
+// fallback never reports upsideDown true in the first place (there's no signal to derive it from),
+// so that branch is already inert there.
 export function getViewRotation(orientationMode: OrientationMode, p1OnRight: boolean, upsideDown: boolean): ViewRotation {
-  if (orientationMode === 'sideBySide') return p1OnRight ? -90 : 90
+  if (orientationMode === 'sideBySide' && Platform.OS !== 'web') return p1OnRight ? -90 : 90
   return upsideDown ? 180 : 0
 }
 

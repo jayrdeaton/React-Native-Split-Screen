@@ -1,3 +1,5 @@
+import { Platform } from 'react-native'
+
 import { getFixedZoneRotation, getOpposingZoneRotation, getViewRotation } from '../rotation'
 
 describe('getViewRotation', () => {
@@ -13,6 +15,32 @@ describe('getViewRotation', () => {
     expect(getViewRotation('sideBySide', false, false)).toBe(90)
     expect(getViewRotation('sideBySide', true, true)).toBe(-90)
     expect(getViewRotation('sideBySide', false, true)).toBe(90)
+  })
+
+  describe('on web', () => {
+    const originalOS = Platform.OS
+
+    afterEach(() => {
+      Platform.OS = originalOS
+    })
+
+    it("never applies sideBySide's own compensating rotation — a browser window has no OS-level portrait lock to compensate for, regardless of p1OnRight", () => {
+      Platform.OS = 'web'
+      expect(getViewRotation('sideBySide', true, false)).toBe(0)
+      expect(getViewRotation('sideBySide', false, false)).toBe(0)
+    })
+
+    it('still falls through to the upsideDown flip on web — moot in practice since the web fallback never reports upsideDown true, but the function itself has no reason to special-case it away', () => {
+      Platform.OS = 'web'
+      expect(getViewRotation('sideBySide', true, true)).toBe(180)
+      expect(getViewRotation('sideBySide', false, true)).toBe(180)
+    })
+
+    it('still applies faceToFace as normal — unaffected by the sideBySide exclusion', () => {
+      Platform.OS = 'web'
+      expect(getViewRotation('faceToFace', true, false)).toBe(0)
+      expect(getViewRotation('faceToFace', true, true)).toBe(180)
+    })
   })
 })
 
