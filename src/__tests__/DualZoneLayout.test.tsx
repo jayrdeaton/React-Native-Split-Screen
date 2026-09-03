@@ -1,7 +1,7 @@
 import { act, render } from '@testing-library/react'
 
-import Animated from '../__mocks__/react-native-reanimated'
 import { View } from '../__mocks__/react-native'
+import Animated from '../__mocks__/react-native-reanimated'
 import { DualZoneLayout } from '../DualZoneLayout'
 import { DualZoneLayoutState } from '../useDualZoneLayout'
 import { useZoneBounds, ZoneBounds } from '../useZoneBounds'
