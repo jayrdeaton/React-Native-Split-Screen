@@ -1,5 +1,6 @@
 import { act, render, renderHook } from '@testing-library/react'
 import { DeviceMotion } from 'expo-sensors'
+import { Platform, useWindowDimensions } from 'react-native'
 
 import { AccelerometerOrientationProvider, AccelerometerOrientationState, useAccelerometerOrientation } from '../useAccelerometerOrientation'
 
@@ -173,5 +174,29 @@ describe('useAccelerometerOrientation', () => {
     )
 
     expect(latest?.orientationMode).toBe('sideBySide')
+  })
+
+  // Same Platform.OS mutation convention as rotation.test.ts's own 'on web' block — mutate the
+  // mocked module's property directly (not a fresh jest.mock, since every other test in this file
+  // needs the native 'ios' default) and restore it afterward so this doesn't leak into them.
+  describe('on web', () => {
+    const originalOS = Platform.OS
+
+    afterEach(() => {
+      Platform.OS = originalOS
+    })
+
+    it('resolves sideBySide with p1OnRight false — left, not whatever the native accelerometer path defaults true to', () => {
+      Platform.OS = 'web'
+      ;(useWindowDimensions as jest.Mock).mockReturnValueOnce({ width: 900, height: 400, scale: 1, fontScale: 1 })
+      const { result } = renderHook(() => useAccelerometerOrientation(), { wrapper })
+      expect(result.current).toEqual({ orientationMode: 'sideBySide', p1OnRight: false, upsideDown: false, resolved: true })
+    })
+
+    it('resolves faceToFace for a taller-than-wide window, same as the mock default', () => {
+      Platform.OS = 'web'
+      const { result } = renderHook(() => useAccelerometerOrientation(), { wrapper })
+      expect(result.current).toEqual({ orientationMode: 'faceToFace', p1OnRight: false, upsideDown: false, resolved: true })
+    })
   })
 })

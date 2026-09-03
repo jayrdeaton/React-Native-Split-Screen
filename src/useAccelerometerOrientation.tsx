@@ -148,8 +148,11 @@ function useAccelerometerOrientationSource(): AccelerometerOrientationState {
 
   if (Platform.OS === 'web') {
     // No way to detect upside-down from window dimensions alone — web never needed it either,
-    // since the OS itself always handled real rotation there.
-    const webState: AccelerometerOrientationState = { orientationMode: webDimensions.width > webDimensions.height ? 'sideBySide' : 'faceToFace', p1OnRight: true, upsideDown: false, resolved: true }
+    // since the OS itself always handled real rotation there. p1OnRight is a fixed choice for the
+    // same reason: there's no physical tilt to read a side from on a browser window, so this picks
+    // left — matching reading order and the natural "player 1 goes first/leftmost" convention —
+    // rather than defaulting to whatever the native accelerometer path happens to resolve `true` to.
+    const webState: AccelerometerOrientationState = { orientationMode: webDimensions.width > webDimensions.height ? 'sideBySide' : 'faceToFace', p1OnRight: false, upsideDown: false, resolved: true }
     latestSnapshot = webState
     return webState
   }
