@@ -1,5 +1,6 @@
 import { act, render } from '@testing-library/react'
 
+import Animated from '../__mocks__/react-native-reanimated'
 import { View } from '../__mocks__/react-native'
 import { DualZoneLayout } from '../DualZoneLayout'
 import { DualZoneLayoutState } from '../useDualZoneLayout'
@@ -32,9 +33,19 @@ function panelLayout(overrides: Partial<DualZoneLayoutState> = {}): DualZoneLayo
   return { orientationMode: 'faceToFace', p1OnRight: true, upsideDown: false, ...overrides }
 }
 
+// Style props render as an array (`[styles.x, panelFadeStyle, cond && styles.elevated]`), not a
+// flattened object — this mock's own StyleSheet.create/flatten are both identity (see
+// __mocks__/react-native.ts), matching real RN's own array-of-styles prop shape closely enough to
+// assert against directly rather than needing a real flatten step.
+function hasElevatedStyle(style: unknown): boolean {
+  const styles = Array.isArray(style) ? style : [style]
+  return styles.some((entry) => !!entry && typeof entry === 'object' && (entry as { zIndex?: number }).zIndex === 100)
+}
+
 describe('DualZoneLayout', () => {
   beforeEach(() => {
     View.mockClear()
+    Animated.View.mockClear()
   })
 
   describe('faceToFace', () => {
@@ -114,6 +125,53 @@ describe('DualZoneLayout', () => {
       const rowBounds = { rotated: false, sharedEdgeY: MEASURED_BOTTOM, zoneSide: 'belowShared' }
       expect(p1Bounds).toEqual(rowBounds)
       expect(p2Bounds).toEqual(rowBounds)
+    })
+  })
+
+  // Regression coverage for a real bug: a shared-row popover (e.g. an arena/settings dropdown)
+  // rendering underneath a player zone's own controls instead of on top of them, because neither
+  // zone wrapper had any way to know the other zone's popover was open — see p1Elevated/p2Elevated/
+  // sharedElevated's own doc on DualZoneLayout's Props for the stacking-context mechanism behind it.
+  describe('zone elevation (p1Elevated/p2Elevated/sharedElevated)', () => {
+    it('leaves the shared zone unelevated by default, and elevated once sharedElevated is set', () => {
+      const unelevated = render(<DualZoneLayout panelLayout={panelLayout({ orientationMode: 'sideBySide' })} panelFadeStyle={{}} p1='p1' p2='p2' shared='shared' />)
+      const sharedCall = View.mock.calls.find(([props]) => typeof props?.onLayout === 'function')
+      expect(hasElevatedStyle(sharedCall?.[0]?.style)).toBe(false)
+      unelevated.unmount()
+      View.mockClear()
+
+      render(<DualZoneLayout panelLayout={panelLayout({ orientationMode: 'sideBySide' })} panelFadeStyle={{}} p1='p1' p2='p2' shared='shared' sharedElevated />)
+      const elevatedSharedCall = View.mock.calls.find(([props]) => typeof props?.onLayout === 'function')
+      expect(hasElevatedStyle(elevatedSharedCall?.[0]?.style)).toBe(true)
+    })
+
+    it('elevates the one shared players row in side-by-side mode when either seat is elevated', () => {
+      render(<DualZoneLayout panelLayout={panelLayout({ orientationMode: 'sideBySide' })} panelFadeStyle={{}} p1='p1' p2='p2' shared='shared' p1Elevated />)
+      // Side-by-side has exactly one Animated.View — the shared players row — so its one and only
+      // call is what p1Elevated (or p2Elevated) needs to reach, regardless of which seat it's for.
+      expect(Animated.View.mock.calls).toHaveLength(1)
+      expect(hasElevatedStyle(Animated.View.mock.calls[0]?.[0]?.style)).toBe(true)
+    })
+
+    it('leaves the players row unelevated in side-by-side mode when neither seat is elevated', () => {
+      render(<DualZoneLayout panelLayout={panelLayout({ orientationMode: 'sideBySide' })} panelFadeStyle={{}} p1='p1' p2='p2' shared='shared' />)
+      expect(hasElevatedStyle(Animated.View.mock.calls[0]?.[0]?.style)).toBe(false)
+    })
+
+    it("elevates only p2's own zone in face-to-face mode when p2Elevated is set, leaving p1's alone", () => {
+      render(<DualZoneLayout panelLayout={panelLayout()} panelFadeStyle={{}} p1='p1' p2='p2' shared='shared' p2Elevated />)
+      // Face-to-face renders p2's zone first (top, rotated), then p1's (bottom) — see the component's
+      // own JSX order, which a single synchronous render preserves in Animated.View.mock.calls.
+      const [p2Call, p1Call] = Animated.View.mock.calls
+      expect(hasElevatedStyle(p2Call?.[0]?.style)).toBe(true)
+      expect(hasElevatedStyle(p1Call?.[0]?.style)).toBe(false)
+    })
+
+    it("elevates only p1's own zone in face-to-face mode when p1Elevated is set, leaving p2's alone", () => {
+      render(<DualZoneLayout panelLayout={panelLayout()} panelFadeStyle={{}} p1='p1' p2='p2' shared='shared' p1Elevated />)
+      const [p2Call, p1Call] = Animated.View.mock.calls
+      expect(hasElevatedStyle(p2Call?.[0]?.style)).toBe(false)
+      expect(hasElevatedStyle(p1Call?.[0]?.style)).toBe(true)
     })
   })
 

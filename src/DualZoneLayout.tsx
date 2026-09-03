@@ -20,6 +20,30 @@ interface Props {
   // for both players regardless of which zone is rotated, so it's meant for whatever's shared
   // rather than owned by either player individually.
   shared?: ReactNode
+  // True while a popover/dropdown *inside that zone* is open and may need to paint over an
+  // adjacent zone it isn't nested inside — e.g. a tall popover that visually overlaps the
+  // neighboring zone's own rectangle rather than actually escaping this component's DOM (see
+  // PopoverBody in @tastic/hud: never portaled, so an open popover is sized by its own content and
+  // can genuinely extend past its zone's edge into whichever zone sits next to it).
+  //
+  // Each zone here (`sharedZone` below, and each of p1/p2's own wrapper) is a `position: 'relative'`
+  // View, and React Native Web gives every one of those an explicit `zIndex: 0` rather than `auto` —
+  // which, per the CSS stacking spec, makes each one the root of its own fresh stacking context.
+  // That's why a popover's own internal elevation (e.g. LobbyPlayerPanel's `panelOpen`,
+  // LobbySharedControls' `containerOpen` — every consuming app's own "am I open, then raise my own
+  // zIndex above my siblings" pattern) only ever wins against siblings *within* the same zone: it
+  // has no way to reach across a zone boundary this component itself owns, since this component is
+  // the first ancestor both zones actually share. Without these props, whichever zone happens to be
+  // the later DOM sibling always paints on top regardless of which one actually has something open —
+  // for the side-by-side layout below, that's the players row over the shared row, every time.
+  //
+  // Each flag is independent (not e.g. a single `elevatedZone` union) because p1 and p2 can each
+  // have something open on their own independent host at the same time in two-player mode, and
+  // whichever zone(s) report true get raised the same way a consumer already raises its own popover
+  // above its own siblings — see the styles below.
+  p1Elevated?: boolean
+  p2Elevated?: boolean
+  sharedElevated?: boolean
 }
 
 // Renders whichever of the two layouts fits the committed orientation — face-to-face (portrait:
@@ -31,7 +55,7 @@ interface Props {
 // Also measures the boundary between the two zones (the shared row's own on-screen position) and
 // provides each zone's own bounds via useZoneBounds — see that hook's own doc for why a zone needs
 // this instead of just reading the full window height.
-export function DualZoneLayout({ panelLayout, panelFadeStyle, p1, p2, shared }: Props) {
+export function DualZoneLayout({ panelLayout, panelFadeStyle, p1, p2, shared, p1Elevated, p2Elevated, sharedElevated }: Props) {
   const isFaceToFace = panelLayout.orientationMode === 'faceToFace'
   const sharedRef = useRef<View>(null)
   // null until the first post-mount measurement lands — see measureShared below. Every zone's own
@@ -52,7 +76,7 @@ export function DualZoneLayout({ panelLayout, panelFadeStyle, p1, p2, shared }: 
   }, [])
 
   const sharedZone = (
-    <View ref={sharedRef} onLayout={measureShared}>
+    <View ref={sharedRef} onLayout={measureShared} style={sharedElevated && styles.elevated}>
       {shared}
     </View>
   )
@@ -72,11 +96,11 @@ export function DualZoneLayout({ panelLayout, panelFadeStyle, p1, p2, shared }: 
 
     return (
       <View style={styles.dualZone}>
-        <Animated.View style={[styles.rotated180, panelFadeStyle]}>
+        <Animated.View style={[styles.rotated180, panelFadeStyle, p2Elevated && styles.elevated]}>
           <ZoneBoundsProvider value={p2Bounds}>{p2}</ZoneBoundsProvider>
         </Animated.View>
         {sharedZone}
-        <Animated.View style={panelFadeStyle}>
+        <Animated.View style={[panelFadeStyle, p1Elevated && styles.elevated]}>
           <ZoneBoundsProvider value={p1Bounds}>{p1}</ZoneBoundsProvider>
         </Animated.View>
       </View>
@@ -90,7 +114,10 @@ export function DualZoneLayout({ panelLayout, panelFadeStyle, p1, p2, shared }: 
   return (
     <View style={styles.stackedZone}>
       {sharedZone}
-      <Animated.View style={[styles.playersRow, panelFadeStyle]}>
+      {/* One shared wrapper for both zones here (unlike faceToFace's separate p1/p2 Animated.Views
+      above), so either zone having something open elevates the same row — see p1Elevated/p2Elevated's
+      own doc for why a plain OR is correct rather than needing to tell the two apart. */}
+      <Animated.View style={[styles.playersRow, panelFadeStyle, (p1Elevated || p2Elevated) && styles.elevated]}>
         <ZoneBoundsProvider value={rowBounds}>{panelLayout.p1OnRight ? p2 : p1}</ZoneBoundsProvider>
         <ZoneBoundsProvider value={rowBounds}>{panelLayout.p1OnRight ? p1 : p2}</ZoneBoundsProvider>
       </Animated.View>
@@ -102,6 +129,13 @@ const styles = StyleSheet.create({
   dualZone: {
     alignItems: 'center',
     gap: 28
+  },
+  // Matches the zIndex every consuming app's own popover-elevation styles already use (e.g.
+  // LightCycles' LobbyPlayerPanel panelOpen/LobbySharedControls containerOpen) — see
+  // p1Elevated/p2Elevated/sharedElevated's own doc for why this component needs its own copy of
+  // that same trick at the zone-wrapper level.
+  elevated: {
+    zIndex: 100
   },
   playersRow: {
     alignItems: 'center',

@@ -1,3 +1,4 @@
+export { needsSharedNeutralZone } from './actionZone'
 export { DualZoneLayout } from './DualZoneLayout'
 export { FakeLandscapeView, type FakeLandscapeViewProps } from './FakeLandscapeView'
 export { type EdgeInsets, rotateInsets } from './insets'

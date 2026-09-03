@@ -2,8 +2,12 @@ import React, { useEffect, useRef, useState } from 'react'
 
 const identity = (x: any) => x
 
+// A jest.fn() (not a plain arrow function) so DualZoneLayout.test.tsx can inspect which style each
+// call received — e.g. its own elevated-zone tests, which assert a caller's p1Elevated/p2Elevated
+// actually reaches the right zone's Animated.View, the same way View below already lets
+// DualZoneLayout.test.tsx inspect the plain shared-zone wrapper's style/onLayout.
 const Animated = {
-  View: ({ children }: { children?: React.ReactNode }) => children ?? null
+  View: jest.fn(({ children }: { children?: React.ReactNode; style?: unknown }) => children ?? null)
 }
 
 export default Animated
