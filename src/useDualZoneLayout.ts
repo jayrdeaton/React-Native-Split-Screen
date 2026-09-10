@@ -1,7 +1,6 @@
+import { OrientationMode } from '@tastic/core'
 import { useCallback, useState } from 'react'
 import { runOnJS, useAnimatedReaction, useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated'
-
-import { OrientationMode } from './types'
 
 export interface DualZoneLayoutState {
   orientationMode: OrientationMode

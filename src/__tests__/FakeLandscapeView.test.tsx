@@ -1,3 +1,4 @@
+import { useOrientationState } from '@tastic/core'
 import { render, screen } from '@testing-library/react'
 import { View } from 'react-native'
 
@@ -6,6 +7,7 @@ import { FakeLandscapeView } from '../FakeLandscapeView'
 describe('FakeLandscapeView', () => {
   beforeEach(() => {
     ;(View as unknown as jest.Mock).mockClear()
+    ;(useOrientationState as jest.Mock).mockClear()
   })
 
   it('renders children directly under the passed style, unrotated, when rotation is 0 (faceToFace, right-side-up)', () => {
@@ -104,6 +106,40 @@ describe('FakeLandscapeView', () => {
       top: (874 - 402) / 2,
       transform: [{ rotate: '-90deg' }],
       width: 874
+    })
+  })
+
+  describe('ambient default (orientationMode/p1OnRight/upsideDown all omitted)', () => {
+    it('falls back to a live useOrientationState() read when every orientation prop is omitted', () => {
+      ;(useOrientationState as jest.Mock).mockReturnValue({ orientationMode: 'faceToFace', p1OnRight: true, upsideDown: true, resolved: true })
+      const style = { backgroundColor: 'purple' }
+      render(<FakeLandscapeView style={style}>hello</FakeLandscapeView>)
+
+      expect(screen.getByText('hello')).toBeTruthy()
+      const calls = (View as unknown as jest.Mock).mock.calls
+      expect(calls).toHaveLength(1)
+      expect(calls[0][0].style).toEqual([style, { transform: [{ rotate: '180deg' }] }])
+    })
+
+    it('honors an explicit prop over the ambient value for that one field, while still falling back for the others', () => {
+      ;(useOrientationState as jest.Mock).mockReturnValue({ orientationMode: 'faceToFace', p1OnRight: true, upsideDown: true, resolved: true })
+      const style = { backgroundColor: 'purple' }
+      // upsideDown explicitly false overrides the ambient upsideDown:true — orientationMode/p1OnRight
+      // still come from the ambient read.
+      render(
+        <FakeLandscapeView upsideDown={false} style={style}>
+          hello
+        </FakeLandscapeView>
+      )
+
+      const calls = (View as unknown as jest.Mock).mock.calls
+      expect(calls).toHaveLength(1)
+      expect(calls[0][0].style).toBe(style)
+    })
+
+    it('passes the locked prop through to useOrientationState', () => {
+      render(<FakeLandscapeView locked={true}>hello</FakeLandscapeView>)
+      expect(useOrientationState).toHaveBeenCalledWith(true)
     })
   })
 })

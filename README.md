@@ -17,9 +17,17 @@ device is held:
 - **Side-by-side** (landscape) — the two players sit shoulder-to-shoulder, so both read the screen
   the same way up.
 
-Reading the device's own physical tilt (via `expo-sensors`' `DeviceMotion`) rather than the OS's own
-rotation is what makes any of this work at all in an app permanently locked to portrait at the OS
-level — there's no live window-shape signal left to read otherwise.
+Reading the device's own physical tilt rather than the OS's own rotation is what makes any of this
+work at all in an app permanently locked to portrait at the OS level — there's no live window-shape
+signal left to read otherwise. That tilt-tracking foundation (the sensor subscription, the
+`OrientationProvider`/`useOrientationState` hooks, and the pure `getViewRotation`/
+`getFixedZoneRotation`/`getOpposingZoneRotation`/`rotateInsets` geometry) lives in
+[`@tastic/core`](https://github.com/jayrdeaton/react-native-game-core) — this package builds its
+own two-player zone layout on top of it, and re-exports all of it under this package's original
+names (`AccelerometerOrientationProvider`, `useAccelerometerOrientation`, ...) for backward
+compatibility. New code should import directly from `@tastic/core` instead — see its own README for
+the current names and the `deviceMotion` injection pattern (this package no longer imports
+`expo-sensors` itself at all).
 
 Two different jobs fall out of that same tilt reading, covered by two different halves of this
 package:
@@ -35,33 +43,40 @@ package:
 
 ## Setup
 
-Mount `AccelerometerOrientationProvider` once, near your app's root — above every screen that reads
-orientation, so the committed reading survives navigation instead of each screen restarting its own
-sensor subscription from scratch:
+Mount `AccelerometerOrientationProvider` (a compat alias for `@tastic/core`'s own
+`OrientationProvider`) once, near your app's root — above every screen that reads orientation, so
+the committed reading survives navigation instead of each screen restarting its own sensor
+subscription from scratch. It needs your own real `expo-sensors` import handed in as a prop — this
+package (like `@tastic/core` underneath it) never imports `expo-sensors` directly itself:
 
 ```tsx
+import { AccelerometerOrientationProvider } from '@tastic/split-screen'
+import { DeviceMotion } from 'expo-sensors'
+
 // App root
-<AccelerometerOrientationProvider>
+<AccelerometerOrientationProvider deviceMotion={DeviceMotion}>
   <AppNavigator />
 </AccelerometerOrientationProvider>
 ```
 
-Without it, `useAccelerometerOrientation` still works but silently falls back to a static default
-and never updates — the same "nothing crashes, it just never resolves" failure mode a missing
-`SafeAreaProvider` has.
+Without a Provider mounted, `useAccelerometerOrientation` still works but silently falls back to a
+static default and never updates — the same "nothing crashes, it just never resolves" failure mode
+a missing `SafeAreaProvider` has. Mounted with no `deviceMotion` prop, it degrades the same way
+(with a one-time `console.warn` in dev, easy to notice if it's accidental).
 
 ## Usage: two-player zones that actually reflow (`DualZoneLayout`)
 
 ```tsx
-import { DualZoneLayout, useAccelerometerOrientation, useDualZoneLayout } from '@tastic/split-screen'
+import { useOrientationState } from '@tastic/core'
+import { DualZoneLayout, useDualZoneLayout } from '@tastic/split-screen'
 
 function LobbyScreen() {
-  // orientationMode/p1OnRight/upsideDown are derived from the device's own physical tilt (via
-  // expo-sensors' DeviceMotion), not the OS's own rotation — this works even in an app permanently
-  // locked to portrait at the OS level, since there's no live window-shape signal left to read
-  // otherwise. `lockOrientationSetting` freezes all three at whatever they last committed, the same
-  // job an app-level "Lock Orientation" preference toggle already wants.
-  const { orientationMode, p1OnRight, upsideDown, resolved } = useAccelerometerOrientation(lockOrientationSetting)
+  // orientationMode/p1OnRight/upsideDown are derived from the device's own physical tilt, not the
+  // OS's own rotation — this works even in an app permanently locked to portrait at the OS level,
+  // since there's no live window-shape signal left to read otherwise. `lockOrientationSetting`
+  // freezes all three at whatever they last committed, the same job an app-level "Lock Orientation"
+  // preference toggle already wants.
+  const { orientationMode, p1OnRight, upsideDown, resolved } = useOrientationState(lockOrientationSetting)
 
   // panelLayout is the *committed* layout — lags one fade behind the live values above. Use it
   // (not the live orientationMode/p1OnRight) for anything else that needs to match what's actually
@@ -104,9 +119,9 @@ content is:
   only each seat's own dialog/HUD content rotates:
 
   ```tsx
-  import { getFixedZoneRotation, getOpposingZoneRotation, useAccelerometerOrientation } from '@tastic/split-screen'
+  import { getFixedZoneRotation, getOpposingZoneRotation, useOrientationState } from '@tastic/core'
 
-  const { orientationMode, p1OnRight, upsideDown } = useAccelerometerOrientation()
+  const { orientationMode, p1OnRight, upsideDown } = useOrientationState()
   const rotation = getFixedZoneRotation(orientationMode, p1OnRight, upsideDown)
   const p2Rotation = getOpposingZoneRotation(rotation)
 
@@ -124,9 +139,18 @@ content is:
   remaps `useSafeAreaInsets()`'s always-physical-frame values onto whichever edge they actually
   correspond to post-rotation.
 
-## Install (local dev via yalc)
+## Install
 
-Not published to the public npm registry yet.
+Published to the public npm registry as `@tastic/split-screen`. The `deviceMotion`-injection change
+described above is newer than the latest published version, though — for now it only exists in
+local, `yalc`-linked builds (see below) until it's published for real; the published version's
+`AccelerometerOrientationProvider` still takes no props at all and imports `expo-sensors` itself.
+
+```bash
+npm install @tastic/split-screen
+```
+
+### Local dev via yalc (for unpublished changes)
 
 ```bash
 cd react-native-split-screen
@@ -143,6 +167,12 @@ linked consumer at once.
 
 ## Peer dependencies
 
-`react`, `react-native`, `react-native-reanimated` (^4 — the fade transition), `expo-sensors`
-(^57 — DeviceMotion tilt reading). None of these are bundled, so use whatever versions your app
-already has.
+`react`, `react-native`, `react-native-reanimated` (^4 — the fade transition), and
+[`@tastic/core`](https://github.com/jayrdeaton/react-native-game-core) (>=0.2.0 — the orientation-
+tracking foundation this package re-exports and builds its own zone layout on top of). None of
+these are bundled, so use whatever versions your app already has.
+
+**Not a dependency: `expo-sensors`.** This package used to import it directly; that moved into
+`@tastic/core`, which never imports it either (see its own README for why) — your app hands in its
+own `expo-sensors` import via the `deviceMotion` prop on `AccelerometerOrientationProvider` (see
+Setup above) if it wants live tilt tracking.

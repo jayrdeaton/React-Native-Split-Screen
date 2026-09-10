@@ -1,6 +1,6 @@
+import { OrientationMode } from '@tastic/core'
 import { renderHook } from '@testing-library/react'
 
-import { OrientationMode } from '../types'
 import { useDualZoneLayout } from '../useDualZoneLayout'
 
 describe('useDualZoneLayout', () => {

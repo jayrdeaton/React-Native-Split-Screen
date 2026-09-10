@@ -1,4 +1,4 @@
-import { OrientationMode } from './types'
+import { OrientationMode } from '@tastic/core'
 
 // True when two players are sharing one device face-to-face — the one layout where a fixed corner
 // (top-left/top-right) isn't reachable by both: one player's zone always reads upside-down there

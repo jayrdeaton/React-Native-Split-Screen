@@ -1,13 +1,20 @@
+import { getViewRotation, OrientationMode, useOrientationState } from '@tastic/core'
 import { ReactNode } from 'react'
 import { StyleProp, StyleSheet, useWindowDimensions, View, ViewStyle } from 'react-native'
 
-import { getViewRotation } from './rotation'
-import { OrientationMode } from './types'
-
 export interface FakeLandscapeViewProps {
-  orientationMode: OrientationMode
-  p1OnRight: boolean
-  upsideDown: boolean
+  // All three default to a live ambient read (via @tastic/core's useOrientationState) when omitted
+  // — a simple screen that just wants "however the phone is actually being held, right now" can
+  // render <FakeLandscapeView> with none of these and get correct, live-updating behavior for free.
+  // Pass them explicitly only when a caller's own reading needs to differ from the ambient one —
+  // e.g. a fading dual-zone layout whose panel content deliberately lags the live reading behind a
+  // transition, where the ambient default would be momentarily wrong mid-fade.
+  orientationMode?: OrientationMode
+  p1OnRight?: boolean
+  upsideDown?: boolean
+  // Only consulted when the ambient default is actually being used (i.e. when orientationMode/
+  // p1OnRight/upsideDown are all omitted) — matches useOrientationState's own `locked` param.
+  locked?: boolean
   style?: StyleProp<ViewStyle>
   children: ReactNode
 }
@@ -26,9 +33,18 @@ export interface FakeLandscapeViewProps {
 // rendered/transformed layout correctly. NOT safe for continuous gesture tracking
 // (react-native-gesture-handler's translation deltas read raw, untransformed native coordinates) —
 // never wrap the game board/touch layer in this.
-export function FakeLandscapeView({ orientationMode, p1OnRight, upsideDown, style, children }: FakeLandscapeViewProps) {
+export function FakeLandscapeView({ orientationMode, p1OnRight, upsideDown, locked = false, style, children }: FakeLandscapeViewProps) {
   const { width, height } = useWindowDimensions()
-  const rotation = getViewRotation(orientationMode, p1OnRight, upsideDown)
+  // Always subscribed, even when every field below ends up overridden by an explicit prop — the
+  // ambient reading has to stay live for the zero-prop case to actually update as the phone moves,
+  // and a caller supplying its own full triple (e.g. loadout's fade-lagged panelLayout) is already
+  // subscribed to the same live source one level up for its own reasons, so this doesn't introduce
+  // a new re-render trigger in practice — just some discarded work within a render already happening.
+  const ambient = useOrientationState(locked)
+  const resolvedOrientationMode = orientationMode ?? ambient.orientationMode
+  const resolvedP1OnRight = p1OnRight ?? ambient.p1OnRight
+  const resolvedUpsideDown = upsideDown ?? ambient.upsideDown
+  const rotation = getViewRotation(resolvedOrientationMode, resolvedP1OnRight, resolvedUpsideDown)
 
   if (rotation === 0) return <View style={style}>{children}</View>
 
