@@ -14,6 +14,7 @@ describe('@tastic/core re-exports (backward compatibility)', () => {
     expect(index.getFixedZoneRotation).toBe(realCore.getFixedZoneRotation)
     expect(index.getOpposingZoneRotation).toBe(realCore.getOpposingZoneRotation)
     expect(index.rotateInsets).toBe(realCore.rotateInsets)
+    expect(index.rotateDimensions).toBe(realCore.rotateDimensions)
   })
 
   it('re-exports the orientation Provider/hook/snapshot under their original Accelerometer-prefixed names, identical to the real implementation', () => {
@@ -24,5 +25,14 @@ describe('@tastic/core re-exports (backward compatibility)', () => {
 
   it('also re-exports the new useRotation convenience hook for a consumer that wants to adopt it directly', () => {
     expect(index.useRotation).toBe(realCore.useRotation)
+  })
+
+  // FakeLandscapeView moved here from this package's own src/ as of core 0.5.0 (see index.ts's own
+  // updated top comment) — it never had any real dependency on this package's two-player pieces, so
+  // this compat re-export is now checked the exact same way as every other moved-to-core primitive
+  // above, not tested behaviorally in this package anymore (full coverage lives in core's own suite).
+  it('re-exports FakeLandscapeView (moved to core in 0.5.0) and useRotatedWindowDimensions under their original names, identical to the real implementation', () => {
+    expect(index.FakeLandscapeView).toBe(realCore.FakeLandscapeView)
+    expect(index.useRotatedWindowDimensions).toBe(realCore.useRotatedWindowDimensions)
   })
 })

@@ -9,7 +9,11 @@
 // genuinely two-player-specific pieces below (DualZoneLayout and friends).
 export { needsSharedNeutralZone } from './actionZone'
 export { DualZoneLayout } from './DualZoneLayout'
-export { FakeLandscapeView, type FakeLandscapeViewProps } from './FakeLandscapeView'
 export { type DualZoneLayoutState, useDualZoneLayout } from './useDualZoneLayout'
 export { useZoneBounds, type ZoneBounds } from './useZoneBounds'
-export { OrientationProvider as AccelerometerOrientationProvider, type OrientationState as AccelerometerOrientationState, type EdgeInsets, getOrientationSnapshot as getAccelerometerOrientationSnapshot, getFixedZoneRotation, getOpposingZoneRotation, getViewRotation, type OrientationMode, rotateInsets, useOrientationState as useAccelerometerOrientation, useRotation, type ViewRotation } from '@tastic/core'
+// FakeLandscapeView moved to @tastic/core as of core 0.5.0 — it never had any real dependency on
+// this package's own two-player pieces (DualZoneLayout etc.), only on the rotation primitives that
+// already moved to core in 0.4.0 below. Re-exported here under its original name for the same
+// backward-compatibility reason as the 0.4.0 move; new consumers should prefer importing it directly
+// from @tastic/core.
+export { OrientationProvider as AccelerometerOrientationProvider, type OrientationState as AccelerometerOrientationState, type EdgeInsets, FakeLandscapeView, type FakeLandscapeViewProps, getOrientationSnapshot as getAccelerometerOrientationSnapshot, getFixedZoneRotation, getOpposingZoneRotation, getViewRotation, type OrientationMode, rotateDimensions, rotateInsets, useOrientationState as useAccelerometerOrientation, useRotatedWindowDimensions, useRotation, type ViewRotation } from '@tastic/core'

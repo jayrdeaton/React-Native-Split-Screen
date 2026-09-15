@@ -4,12 +4,13 @@
 // ts-jest then refuses to transform (transformIgnorePatterns excludes node_modules by default).
 // Mocked instead of fighting that config, same approach @tastic/hud's own identical mock takes.
 //
-// The pure rotation/inset functions are trivial enough to just reimplement verbatim (this package's
-// own FakeLandscapeView needs REAL results from these, not a stub — see its test file's existing
-// 0°/90°/-90°/180° cases). useOrientationState is stubbed instead: every existing FakeLandscapeView
-// test passes its own explicit orientationMode/p1OnRight/upsideDown props, so the ambient value is
-// never actually read in practice — a test asserting the new ambient-default path overrides this
-// per-case via mockReturnValueOnce/mockReturnValue.
+// FakeLandscapeView (the one component here that used to need REAL results from the pure rotation
+// functions below, not a stub) moved to @tastic/core itself as of core 0.5.0 — full behavioral
+// coverage for it now lives in core's own suite, exercising the real implementation directly, not
+// this mock. The pure functions are kept here (reimplemented verbatim, still real results) because
+// compatExports.test.ts's own re-export check needs this mock's shape to match — and useOrientationState
+// is still stubbed rather than reimplemented, since nothing left in this package's own tests needs its
+// full committed-reading behavior (that's core's own test suite's job now too).
 export type ViewRotation = 0 | 90 | 180 | -90
 
 export function getViewRotation(orientationMode: 'faceToFace' | 'sideBySide', p1OnRight: boolean, upsideDown: boolean): ViewRotation {
@@ -41,6 +42,12 @@ export function rotateInsets(insets: EdgeInsets, rotation: ViewRotation): EdgeIn
   return { top: edgeFor('top'), right: edgeFor('right'), bottom: edgeFor('bottom'), left: edgeFor('left') }
 }
 
+export function rotateDimensions(width: number, height: number, rotation: ViewRotation): { width: number; height: number } {
+  return Math.abs(rotation) === 90 ? { width: height, height: width } : { width, height }
+}
+
 export const useOrientationState = jest.fn(() => ({ orientationMode: 'faceToFace' as const, p1OnRight: true, upsideDown: false, resolved: true }))
 
 export const useRotation = jest.fn(() => 0)
+
+export const useRotatedWindowDimensions = jest.fn(() => ({ width: 402, height: 874 }))

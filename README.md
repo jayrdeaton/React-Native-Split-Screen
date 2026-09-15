@@ -20,8 +20,9 @@ device is held:
 Reading the device's own physical tilt rather than the OS's own rotation is what makes any of this
 work at all in an app permanently locked to portrait at the OS level — there's no live window-shape
 signal left to read otherwise. That tilt-tracking foundation (the sensor subscription, the
-`OrientationProvider`/`useOrientationState` hooks, and the pure `getViewRotation`/
-`getFixedZoneRotation`/`getOpposingZoneRotation`/`rotateInsets` geometry) lives in
+`OrientationProvider`/`useOrientationState` hooks, `FakeLandscapeView`/`useRotatedWindowDimensions`,
+and the pure `getViewRotation`/`getFixedZoneRotation`/`getOpposingZoneRotation`/`rotateInsets`/
+`rotateDimensions` geometry) lives in
 [`@tastic/core`](https://github.com/jayrdeaton/react-native-game-core) — this package builds its
 own two-player zone layout on top of it, and re-exports all of it under this package's original
 names (`AccelerometerOrientationProvider`, `useAccelerometerOrientation`, ...) for backward
@@ -99,7 +100,7 @@ function LobbyScreen() {
 (face-to-face rotate-and-stack vs. side-by-side row). A solo screen (nothing to rotate for) doesn't
 need it at all — just render your own content.
 
-## Usage: content that must NOT reflow (`getViewRotation` / `FakeLandscapeView` / fixed zones)
+## Usage: content that must NOT reflow (`getViewRotation` / fixed zones)
 
 Not everything can reflow. A game board (and its touch zones) usually needs to keep the exact same
 geometry regardless of which way the device is held — only the *decoration* on top of it (dialogs,
@@ -107,11 +108,13 @@ countdowns, HUD chips) should rotate in place to stay legible. Three flavors, de
 content is:
 
 - **Single-perspective, whole-screen content** (a title screen, a settings dialog) — wrap it in
-  `FakeLandscapeView`, which swaps width/height for a genuine 90°/-90° hold (the standard
-  "fake landscape inside a portrait-locked app" trick) and does a plain rotate for 180°. Reads
-  `getViewRotation(orientationMode, p1OnRight, upsideDown)` internally; call that function yourself
-  if you just need the raw angle (e.g. to rotate a single dialog's content in place instead of using
-  the wrapper — see `rotation` in the example below).
+  `FakeLandscapeView`. This moved to [`@tastic/core`](https://github.com/jayrdeaton/react-native-game-core)
+  as of core 0.5.0 — it never had any real dependency on this package's own two-player pieces
+  (`DualZoneLayout` and friends), only on the rotation primitives that already lived in core. Still
+  re-exported here under its original name for backward compatibility (see the compat note in Setup
+  above); new code should import it directly from `@tastic/core` — see that package's own README for
+  the full usage example and its "safe for tap-driven content, not for continuous gesture tracking"
+  warning.
 
 - **Two fixed zones that never reflow** (e.g. a game board permanently split top/bottom, one player
   per half, regardless of tilt) — use `getFixedZoneRotation` for the first seat's rotation, and
@@ -141,10 +144,12 @@ content is:
 
 ## Install
 
-Published to the public npm registry as `@tastic/split-screen`. The `deviceMotion`-injection change
-described above is newer than the latest published version, though — for now it only exists in
-local, `yalc`-linked builds (see below) until it's published for real; the published version's
-`AccelerometerOrientationProvider` still takes no props at all and imports `expo-sensors` itself.
+Published to the public npm registry as `@tastic/split-screen`. `FakeLandscapeView`'s move to
+`@tastic/core` (see above) is newer than the latest published version, though — for now the local
+source here still has it removed with a compat re-export pointing at an unpublished `@tastic/core`
+build, so this only really works end-to-end via `yalc`-linked builds of both packages (see below)
+until they're published for real. Everything else described above, including the `deviceMotion`
+injection pattern, is already live on npm.
 
 ```bash
 npm install @tastic/split-screen
@@ -168,9 +173,10 @@ linked consumer at once.
 ## Peer dependencies
 
 `react`, `react-native`, `react-native-reanimated` (^4 — the fade transition), and
-[`@tastic/core`](https://github.com/jayrdeaton/react-native-game-core) (>=0.2.0 — the orientation-
-tracking foundation this package re-exports and builds its own zone layout on top of). None of
-these are bundled, so use whatever versions your app already has.
+[`@tastic/core`](https://github.com/jayrdeaton/react-native-game-core) (>=0.3.0 — the orientation-
+tracking foundation this package re-exports and builds its own zone layout on top of; bump this
+again once a core version with `FakeLandscapeView` is actually published, since the compat re-export
+above needs it). None of these are bundled, so use whatever versions your app already has.
 
 **Not a dependency: `expo-sensors`.** This package used to import it directly; that moved into
 `@tastic/core`, which never imports it either (see its own README for why) — your app hands in its
