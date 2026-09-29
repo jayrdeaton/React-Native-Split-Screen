@@ -144,12 +144,9 @@ content is:
 
 ## Install
 
-Published to the public npm registry as `@tastic/split-screen`. `FakeLandscapeView`'s move to
-`@tastic/core` (see above) is newer than the latest published version, though — for now the local
-source here still has it removed with a compat re-export pointing at an unpublished `@tastic/core`
-build, so this only really works end-to-end via `yalc`-linked builds of both packages (see below)
-until they're published for real. Everything else described above, including the `deviceMotion`
-injection pattern, is already live on npm.
+Published to the public npm registry as `@tastic/split-screen`. Everything described above,
+including `FakeLandscapeView`'s move to `@tastic/core` (re-exported here for backward
+compatibility) and the `deviceMotion` injection pattern, is live on npm as of 0.5.0.
 
 ```bash
 npm install @tastic/split-screen
@@ -173,10 +170,10 @@ linked consumer at once.
 ## Peer dependencies
 
 `react`, `react-native`, `react-native-reanimated` (^4 — the fade transition), and
-[`@tastic/core`](https://github.com/jayrdeaton/react-native-game-core) (>=0.3.0 — the orientation-
-tracking foundation this package re-exports and builds its own zone layout on top of; bump this
-again once a core version with `FakeLandscapeView` is actually published, since the compat re-export
-above needs it). None of these are bundled, so use whatever versions your app already has.
+[`@tastic/core`](https://github.com/jayrdeaton/react-native-game-core) (>=0.5.0 — the orientation-
+tracking foundation this package re-exports and builds its own zone layout on top of; the floor
+reflects `FakeLandscapeView`'s own move there, which this package's compat re-export needs). None of
+these are bundled, so use whatever versions your app already has.
 
 **Not a dependency: `expo-sensors`.** This package used to import it directly; that moved into
 `@tastic/core`, which never imports it either (see its own README for why) — your app hands in its
