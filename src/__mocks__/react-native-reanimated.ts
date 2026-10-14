@@ -3,7 +3,7 @@ import React, { useEffect, useRef, useState } from 'react'
 const identity = (x: any) => x
 
 // A jest.fn() (not a plain arrow function) so DualZoneLayout.test.tsx can inspect which style each
-// call received — e.g. its own elevated-zone tests, which assert a caller's p1Elevated/p2Elevated
+// call received - e.g. its own elevated-zone tests, which assert a caller's p1Elevated/p2Elevated
 // actually reaches the right zone's Animated.View, the same way View below already lets
 // DualZoneLayout.test.tsx inspect the plain shared-zone wrapper's style/onLayout.
 const Animated = {
@@ -13,7 +13,7 @@ const Animated = {
 export default Animated
 
 // Test-only instrumentation: every useAnimatedReaction registers a runner here, and every
-// shared-value write notifies all of them — a coarse stand-in for the real UI-thread frame loop
+// shared-value write notifies all of them - a coarse stand-in for the real UI-thread frame loop
 // that's good enough for these hook tests.
 const reactionRunners = new Set<() => void>()
 const notifyReactions = () => reactionRunners.forEach((run) => run())
@@ -44,7 +44,7 @@ export const useAnimatedReaction = (prepare: () => any, react: (curr: any, prev:
   useEffect(() => {
     const run = () => {
       // `react` here can itself write to a shared value (e.g. withTiming inside the callback),
-      // which synchronously re-notifies every runner — including this one, re-entrantly, while
+      // which synchronously re-notifies every runner - including this one, re-entrantly, while
       // the outer call is still executing. The real library schedules that on the UI-thread frame
       // loop instead of recursing; this guard is this mock's stand-in for that, and recording the
       // transition as handled *before* calling `react` (not after) is what keeps a re-entrant call

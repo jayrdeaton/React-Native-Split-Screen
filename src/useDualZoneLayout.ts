@@ -5,7 +5,7 @@ import { runOnJS, useAnimatedReaction, useAnimatedStyle, useSharedValue, withTim
 export interface DualZoneLayoutState {
   orientationMode: OrientationMode
   p1OnRight: boolean
-  // Only meaningful when orientationMode === 'faceToFace' — see useAccelerometerOrientation and
+  // Only meaningful when orientationMode === 'faceToFace' - see useAccelerometerOrientation and
   // getViewRotation. Carried through this same commit/fade mechanism (rather than tracked
   // separately, live) so a FakeLandscapeView driven by this committed state stays in lockstep with
   // whichever arrangement DualZoneLayout itself is actually painting, mid-fade included.
@@ -15,20 +15,20 @@ export interface DualZoneLayoutState {
 const DEFAULT_FADE_MS = 200
 
 // Committed layout state (which branch renders, which side each player is on) plus the opacity
-// style to drive a fade across a mid-lobby rotation — factored out of the rendering itself (see
+// style to drive a fade across a mid-lobby rotation - factored out of the rendering itself (see
 // DualZoneLayout) because callers typically need this same committed state for more than the
 // layout: e.g. sizing a press-away zone rect to match whichever side is currently on screen (see
 // this package's README) needs to agree with the *painted* layout, not the live device orientation,
 // mid-fade included.
 //
 // The returned `panelLayout` deliberately lags one fade behind the live `orientationMode`/
-// `p1OnRight` passed in — a rotation fades the old layout out, swaps the underlying content, then
+// `p1OnRight` passed in - a rotation fades the old layout out, swaps the underlying content, then
 // fades the new one in, rather than snapping instantly (which reads as content teleporting/
 // flickering mid-rotation, since native panel content can reflow a frame or two before the fade
 // visually covers it).
 export function useDualZoneLayout(orientationMode: OrientationMode, p1OnRight: boolean, p1OnRightResolved: boolean, upsideDown = false, fadeDurationMs = DEFAULT_FADE_MS): { panelLayout: DualZoneLayoutState; panelFadeStyle: ReturnType<typeof useAnimatedStyle> } {
   // The panel area's own layout lags one fade behind the live orientationMode/p1OnRight/upsideDown
-  // above — see panelOpacity below.
+  // above - see panelOpacity below.
   const [panelLayout, setPanelLayout] = useState<DualZoneLayoutState>({ orientationMode, p1OnRight, upsideDown })
   const panelOpacity = useSharedValue(1)
 
@@ -36,7 +36,7 @@ export function useDualZoneLayout(orientationMode: OrientationMode, p1OnRight: b
   // reaction below, on the theory that comparing live values against the already-committed
   // panelLayout would keep the fade-in from firing until the new layout was "the one on screen." In
   // practice it wasn't: setPanelLayout finishing on the JS thread only means React has reconciled
-  // the new prop order, not that Fabric has actually mounted/painted it — the panelOpacity fade-in,
+  // the new prop order, not that Fabric has actually mounted/painted it - the panelOpacity fade-in,
   // being a UI-thread worklet, can start climbing back to 1 a frame or two before that native paint
   // catches up, so the swap becomes visible mid-fade instead of hidden behind it. commitPanelSwap
   // below inserts an explicit couple of frames between the commit and the reveal so the reveal
@@ -66,7 +66,7 @@ export function useDualZoneLayout(orientationMode: OrientationMode, p1OnRight: b
       if (previousPhase === null || phase !== 'mismatch' || phase === previousPhase) return
       // The 'unresolved' phase exists so a fresh mount doesn't itself fade: p1OnRight starts as a
       // guess (see useP1OnRight) and corrects itself moments later once its own initial orientation
-      // check resolves — that correction isn't a real rotation, so it snaps straight to the right
+      // check resolves - that correction isn't a real rotation, so it snaps straight to the right
       // layout instead of fading like an actual mid-lobby rotation would.
       if (previousPhase === 'unresolved') {
         runOnJS(setPanelLayout)({ orientationMode, p1OnRight, upsideDown })
@@ -74,12 +74,12 @@ export function useDualZoneLayout(orientationMode: OrientationMode, p1OnRight: b
       }
       // react-hooks/immutability flags this .value write as "modifying a value previously passed
       // as an argument to a hook" (referring to panelOpacity showing up in commitPanelSwap's own
-      // useCallback deps above) — but mutating a shared value's .value from inside a reaction is
+      // useCallback deps above) - but mutating a shared value's .value from inside a reaction is
       // exactly the API useSharedValue/useAnimatedReaction are designed around, and the same rule
       // is satisfied by moving this same statement into a requestAnimationFrame callback (see
       // commitPanelSwap), confirming it's losing track of the mutation once it crosses into an
       // unrecognized callback rather than catching an actual bug. Deliberately not restructured
-      // just to dodge that gap — doing so would mean either delaying the fade-out start behind a
+      // just to dodge that gap - doing so would mean either delaying the fade-out start behind a
       // rAF (an unjustified behavior change) or adding a callback purely to fool the linter.
       // eslint-disable-next-line react-hooks/immutability
       panelOpacity.value = withTiming(0, { duration: fadeDurationMs }, (finished) => {

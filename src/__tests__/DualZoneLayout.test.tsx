@@ -6,13 +6,13 @@ import { DualZoneLayout } from '../DualZoneLayout'
 import { DualZoneLayoutState } from '../useDualZoneLayout'
 import { useZoneBounds, ZoneBounds } from '../useZoneBounds'
 
-// Same shape the mocked View hands back through `ref.measureInWindow` — see
+// Same shape the mocked View hands back through `ref.measureInWindow` - see
 // src/__mocks__/react-native.ts's FAKE_MEASURED_RECT. y=120, height=48, so bottom = 168.
 const MEASURED_TOP = 120
 const MEASURED_BOTTOM = 168
 
-// Fires the sharedZone wrapper's onLayout — the one View.mock call that received an onLayout prop
-// — which is what actually triggers measureShared in real usage (the shared row's own layout
+// Fires the sharedZone wrapper's onLayout - the one View.mock call that received an onLayout prop
+// - which is what actually triggers measureShared in real usage (the shared row's own layout
 // landing after mount). Wrapped in act() since it drives a setState (sharedBounds).
 function measureSharedZone() {
   const sharedZoneCall = View.mock.calls.find(([props]) => typeof props?.onLayout === 'function')
@@ -21,7 +21,7 @@ function measureSharedZone() {
   })
 }
 
-// Mirrors the 'Consumer' pattern in useAccelerometerOrientation.test.tsx — there's no DOM way to
+// Mirrors the 'Consumer' pattern in useAccelerometerOrientation.test.tsx - there's no DOM way to
 // read a React context from outside, so this renders as one of p1/p2/shared and reports whatever
 // bounds it sees via a callback instead.
 function BoundsProbe({ label, onValue }: { label: string; onValue: (value: ZoneBounds | null) => void }) {
@@ -34,7 +34,7 @@ function panelLayout(overrides: Partial<DualZoneLayoutState> = {}): DualZoneLayo
 }
 
 // Style props render as an array (`[styles.x, panelFadeStyle, cond && styles.elevated]`), not a
-// flattened object — this mock's own StyleSheet.create/flatten are both identity (see
+// flattened object - this mock's own StyleSheet.create/flatten are both identity (see
 // __mocks__/react-native.ts), matching real RN's own array-of-styles prop shape closely enough to
 // assert against directly rather than needing a real flatten step.
 function hasElevatedStyle(style: unknown): boolean {
@@ -74,7 +74,7 @@ describe('DualZoneLayout', () => {
       render(<DualZoneLayout panelLayout={panelLayout({ upsideDown: false })} panelFadeStyle={{}} p1={<BoundsProbe label='p1' onValue={(value) => (p1Bounds = value)} />} p2={<BoundsProbe label='p2' onValue={(value) => (p2Bounds = value)} />} />)
       measureSharedZone()
 
-      // p2's own 180° cancels the (absent, upsideDown=false) outer flip back to true here — see
+      // p2's own 180° cancels the (absent, upsideDown=false) outer flip back to true here - see
       // DualZoneLayout's own doc for why this is XOR'd rather than hardcoded per zone.
       expect(p2Bounds).toEqual({ rotated: true, sharedEdgeY: MEASURED_TOP, zoneSide: 'aboveShared' })
       expect(p1Bounds).toEqual({ rotated: false, sharedEdgeY: MEASURED_BOTTOM, zoneSide: 'belowShared' })
@@ -87,7 +87,7 @@ describe('DualZoneLayout', () => {
       render(<DualZoneLayout panelLayout={panelLayout({ upsideDown: true })} panelFadeStyle={{}} p1={<BoundsProbe label='p1' onValue={(value) => (p1Bounds = value)} />} p2={<BoundsProbe label='p2' onValue={(value) => (p2Bounds = value)} />} />)
       measureSharedZone()
 
-      // Same measured edges as the right-side-up case — only `rotated` swaps, for both zones.
+      // Same measured edges as the right-side-up case - only `rotated` swaps, for both zones.
       expect(p2Bounds).toEqual({ rotated: false, sharedEdgeY: MEASURED_TOP, zoneSide: 'aboveShared' })
       expect(p1Bounds).toEqual({ rotated: true, sharedEdgeY: MEASURED_BOTTOM, zoneSide: 'belowShared' })
     })
@@ -130,7 +130,7 @@ describe('DualZoneLayout', () => {
 
   // Regression coverage for a real bug: a shared-row popover (e.g. an arena/settings dropdown)
   // rendering underneath a player zone's own controls instead of on top of them, because neither
-  // zone wrapper had any way to know the other zone's popover was open — see p1Elevated/p2Elevated/
+  // zone wrapper had any way to know the other zone's popover was open - see p1Elevated/p2Elevated/
   // sharedElevated's own doc on DualZoneLayout's Props for the stacking-context mechanism behind it.
   describe('zone elevation (p1Elevated/p2Elevated/sharedElevated)', () => {
     it('leaves the shared zone unelevated by default, and elevated once sharedElevated is set', () => {
@@ -147,7 +147,7 @@ describe('DualZoneLayout', () => {
 
     it('elevates the one shared players row in side-by-side mode when either seat is elevated', () => {
       render(<DualZoneLayout panelLayout={panelLayout({ orientationMode: 'sideBySide' })} panelFadeStyle={{}} p1='p1' p2='p2' shared='shared' p1Elevated />)
-      // Side-by-side has exactly one Animated.View — the shared players row — so its one and only
+      // Side-by-side has exactly one Animated.View - the shared players row - so its one and only
       // call is what p1Elevated (or p2Elevated) needs to reach, regardless of which seat it's for.
       expect(Animated.View.mock.calls).toHaveLength(1)
       expect(hasElevatedStyle(Animated.View.mock.calls[0]?.[0]?.style)).toBe(true)
@@ -160,7 +160,7 @@ describe('DualZoneLayout', () => {
 
     it("elevates only p2's own zone in face-to-face mode when p2Elevated is set, leaving p1's alone", () => {
       render(<DualZoneLayout panelLayout={panelLayout()} panelFadeStyle={{}} p1='p1' p2='p2' shared='shared' p2Elevated />)
-      // Face-to-face renders p2's zone first (top, rotated), then p1's (bottom) — see the component's
+      // Face-to-face renders p2's zone first (top, rotated), then p1's (bottom) - see the component's
       // own JSX order, which a single synchronous render preserves in Animated.View.mock.calls.
       const [p2Call, p1Call] = Animated.View.mock.calls
       expect(hasElevatedStyle(p2Call?.[0]?.style)).toBe(true)

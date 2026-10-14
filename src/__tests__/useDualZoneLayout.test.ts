@@ -10,7 +10,7 @@ describe('useDualZoneLayout', () => {
   })
 
   it('snaps straight to the corrected value on first resolve, without treating it as a rotation', () => {
-    // p1OnRight starts as a guess (true) before useP1OnRight's own check resolves — this mirrors
+    // p1OnRight starts as a guess (true) before useP1OnRight's own check resolves - this mirrors
     // that guess landing wrong (resolving to false) on the very first render.
     const { result, rerender } = renderHook(({ p1OnRight, resolved }) => useDualZoneLayout('faceToFace', p1OnRight, resolved, false), {
       initialProps: { p1OnRight: true, resolved: false }
