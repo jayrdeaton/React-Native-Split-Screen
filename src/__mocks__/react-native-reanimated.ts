@@ -76,4 +76,3 @@ export const withTiming = (toValue: any, _config?: any, callback?: any) => {
   return toValue
 }
 export const withSpring = identity
-export const runOnJS = (fn: any) => fn

@@ -1,6 +1,7 @@
 import { OrientationMode } from '@tastic/core'
 import { useCallback, useState } from 'react'
-import { runOnJS, useAnimatedReaction, useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated'
+import { useAnimatedReaction, useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated'
+import { scheduleOnRN } from 'react-native-worklets'
 
 export interface DualZoneLayoutState {
   orientationMode: OrientationMode
@@ -69,7 +70,7 @@ export function useDualZoneLayout(orientationMode: OrientationMode, p1OnRight: b
       // check resolves - that correction isn't a real rotation, so it snaps straight to the right
       // layout instead of fading like an actual mid-lobby rotation would.
       if (previousPhase === 'unresolved') {
-        runOnJS(setPanelLayout)({ orientationMode, p1OnRight, upsideDown })
+        scheduleOnRN(setPanelLayout, { orientationMode, p1OnRight, upsideDown })
         return
       }
       // react-hooks/immutability flags this .value write as "modifying a value previously passed
@@ -83,7 +84,7 @@ export function useDualZoneLayout(orientationMode: OrientationMode, p1OnRight: b
       // rAF (an unjustified behavior change) or adding a callback purely to fool the linter.
       // eslint-disable-next-line react-hooks/immutability
       panelOpacity.value = withTiming(0, { duration: fadeDurationMs }, (finished) => {
-        if (finished) runOnJS(commitPanelSwap)(orientationMode, p1OnRight, upsideDown)
+        if (finished) scheduleOnRN(commitPanelSwap, orientationMode, p1OnRight, upsideDown)
       })
     }
   )
