@@ -1,3 +1,4 @@
+import { callWorkletCallback, useWorkletCallback } from '@rific/core'
 import { OrientationMode } from '@tastic/core'
 import { useCallback, useState } from 'react'
 import { useAnimatedReaction, useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated'
@@ -58,6 +59,12 @@ export function useDualZoneLayout(orientationMode: OrientationMode, p1OnRight: b
     [panelOpacity, fadeDurationMs]
   )
 
+  // The reaction below reaches both through @rific/core's key registry, never scheduleOnRN(setPanelLayout) or
+  // scheduleOnRN(commitPanelSwap): worklets holds a scheduleOnRN target from native code for as long as the reaction this
+  // component holds lives, and each leads back to this component, so that loop kept every screen that used this hook in memory.
+  const setPanelLayoutKey = useWorkletCallback(setPanelLayout)
+  const commitPanelSwapKey = useWorkletCallback(commitPanelSwap)
+
   useAnimatedReaction(
     () => {
       if (!p1OnRightResolved) return 'unresolved'
@@ -70,7 +77,7 @@ export function useDualZoneLayout(orientationMode: OrientationMode, p1OnRight: b
       // check resolves - that correction isn't a real rotation, so it snaps straight to the right
       // layout instead of fading like an actual mid-lobby rotation would.
       if (previousPhase === 'unresolved') {
-        scheduleOnRN(setPanelLayout, { orientationMode, p1OnRight, upsideDown })
+        scheduleOnRN(callWorkletCallback, setPanelLayoutKey, { orientationMode, p1OnRight, upsideDown })
         return
       }
       // react-hooks/immutability flags this .value write as "modifying a value previously passed
@@ -84,7 +91,7 @@ export function useDualZoneLayout(orientationMode: OrientationMode, p1OnRight: b
       // rAF (an unjustified behavior change) or adding a callback purely to fool the linter.
       // eslint-disable-next-line react-hooks/immutability
       panelOpacity.value = withTiming(0, { duration: fadeDurationMs }, (finished) => {
-        if (finished) scheduleOnRN(commitPanelSwap, orientationMode, p1OnRight, upsideDown)
+        if (finished) scheduleOnRN(callWorkletCallback, commitPanelSwapKey, orientationMode, p1OnRight, upsideDown)
       })
     }
   )

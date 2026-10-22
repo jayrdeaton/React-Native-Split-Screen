@@ -172,8 +172,9 @@ linked consumer at once.
 `react`, `react-native`, `react-native-reanimated` (^4 - the fade transition), and
 [`@tastic/core`](https://github.com/jayrdeaton/react-native-game-core) (>=0.5.0 - the orientation-
 tracking foundation this package re-exports and builds its own zone layout on top of; the floor
-reflects `FakeLandscapeView`'s own move there, which this package's compat re-export needs). None of
-these are bundled, so use whatever versions your app already has.
+reflects `FakeLandscapeView`'s own move there, which this package's compat re-export needs), and
+[`@rific/core`](https://github.com/jayrdeaton/React-Native-Core) (>=0.5.0 - `useWorkletCallback`, which
+carries the fade's layout swap back to JS; `@tastic/core` already requires it). None of these are bundled, so use whatever versions your app already has.
 
 **Not a dependency: `expo-sensors`.** This package used to import it directly; that moved into
 `@tastic/core`, which never imports it either (see its own README for why) - your app hands in its
