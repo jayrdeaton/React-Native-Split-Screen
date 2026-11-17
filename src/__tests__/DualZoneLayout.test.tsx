@@ -21,8 +21,7 @@ function measureSharedZone() {
   })
 }
 
-// Mirrors the 'Consumer' pattern in useAccelerometerOrientation.test.tsx - there's no DOM way to
-// read a React context from outside, so this renders as one of p1/p2/shared and reports whatever
+// There's no DOM way to read a React context from outside, so this renders as one of p1/p2/shared and reports whatever
 // bounds it sees via a callback instead.
 function BoundsProbe({ label, onValue }: { label: string; onValue: (value: ZoneBounds | null) => void }) {
   onValue(useZoneBounds())

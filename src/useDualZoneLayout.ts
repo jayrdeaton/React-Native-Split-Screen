@@ -1,5 +1,5 @@
 import { callWorkletCallback, useWorkletCallback } from '@rific/core'
-import { OrientationMode } from '@tastic/core'
+import type { OrientationMode } from '@tastic/core'
 import { useCallback, useState } from 'react'
 import { useAnimatedReaction, useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated'
 import { scheduleOnRN } from 'react-native-worklets'
@@ -7,8 +7,8 @@ import { scheduleOnRN } from 'react-native-worklets'
 export interface DualZoneLayoutState {
   orientationMode: OrientationMode
   p1OnRight: boolean
-  // Only meaningful when orientationMode === 'faceToFace' - see useAccelerometerOrientation and
-  // getViewRotation. Carried through this same commit/fade mechanism (rather than tracked
+  // Only meaningful when orientationMode === 'faceToFace' - see @tastic/core's useOrientationState
+  // (which reports it false since 0.15). Carried through this same commit/fade mechanism (rather than tracked
   // separately, live) so a FakeLandscapeView driven by this committed state stays in lockstep with
   // whichever arrangement DualZoneLayout itself is actually painting, mid-fade included.
   upsideDown: boolean

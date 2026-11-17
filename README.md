@@ -4,8 +4,9 @@ Two-player split-screen layout engine for React Native games: device-orientation
 splitting, which physical side each player lands on, and the fade transition between them.
 
 Sibling to [`@tastic/hud`](https://github.com/jayrdeaton/react-native-hud), the popover/dropdown/
-gauge/dialog kit whose components render correctly inside this package's 180°-rotated zone. Neither
-package depends on the other; they compose at your own screen.
+gauge/dialog kit whose components render correctly inside this package's 180°-rotated zone. This
+package never imports hud; hud imports this one only for its `useZoneClampedAlign` (an optional peer
+there, which reads `useZoneBounds` below). They compose at your own screen.
 
 ## What it does
 
@@ -17,53 +18,29 @@ device is held:
 - **Side-by-side** (landscape): the two players sit shoulder-to-shoulder, so both read the screen
   the same way up.
 
-Reading the device's own physical tilt rather than the OS's own rotation is what makes any of this
-work at all in an app permanently locked to portrait at the OS level - there's no live window-shape
-signal left to read otherwise. That tilt-tracking foundation (the sensor subscription, the
-`OrientationProvider`/`useOrientationState` hooks, `FakeLandscapeView`/`useRotatedWindowDimensions`,
-and the pure `getViewRotation`/`getFixedZoneRotation`/`getOpposingZoneRotation`/`rotateInsets`/
-`rotateDimensions` geometry) lives in
-[`@tastic/core`](https://github.com/jayrdeaton/react-native-game-core) - this package builds its
-own two-player zone layout on top of it, and re-exports all of it under this package's original
-names (`AccelerometerOrientationProvider`, `useAccelerometerOrientation`, ...) for backward
-compatibility. New code should import directly from `@tastic/core` instead - see its own README for
-the current names and the `deviceMotion` injection pattern (this package no longer imports
-`expo-sensors` itself at all).
-
-Two different jobs fall out of that same tilt reading, covered by two different halves of this
-package:
+Which arrangement a device is in right now (the seat mode) is
+[`@tastic/core`](https://github.com/jayrdeaton/react-native-game-core)'s `useOrientationState`: side by
+side when the window is wider than tall, face to face otherwise, following the window live, with no
+provider to mount (see core's "Seat mode and orientation"). This package is the two-player layout on top
+of that reading:
 
 - **Zones that are free to reflow** (a lobby's player panels): `DualZoneLayout` renders face-to-face
-  (rotate-and-stack) or side-by-side (plain left/right row) to match, fading across a mid-session
-  rotation instead of snapping instantly (which reads as content teleporting/flickering, since native
-  content can reflow a frame or two before a fade would otherwise cover it).
-- **Zones that must stay exactly where they are** (a game board's own fixed touch zones) -
-  `getFixedZoneRotation`/`getOpposingZoneRotation` rotate just the decoration on top (dialogs,
-  countdowns, HUD chips) in place, leaving the zone geometry untouched. See the second usage section
-  below.
+  (rotate-and-stack) or side-by-side (plain left/right row) to match, fading across a change instead of
+  snapping instantly (which reads as content teleporting/flickering, since native content can reflow a
+  frame or two before a fade would otherwise cover it).
+- **Inside a zone**, `useZoneBounds` tells a popover where its zone ends, and `needsSharedNeutralZone`
+  says whether shared actions can sit in a corner.
 
-## Setup
-
-Mount `AccelerometerOrientationProvider` (a compat alias for `@tastic/core`'s own
-`OrientationProvider`) once, near your app's root - above every screen that reads orientation, so
-the committed reading survives navigation instead of each screen restarting its own sensor
-subscription from scratch. It needs your own real `expo-sensors` import handed in as a prop - this
-package (like `@tastic/core` underneath it) never imports `expo-sensors` directly itself:
-
-```tsx
-import { AccelerometerOrientationProvider } from '@tastic/split-screen'
-import { DeviceMotion } from 'expo-sensors'
-
-// App root
-<AccelerometerOrientationProvider deviceMotion={DeviceMotion}>
-  <AppNavigator />
-</AccelerometerOrientationProvider>
-```
-
-Without a Provider mounted, `useAccelerometerOrientation` still works but silently falls back to a
-static default and never updates - the same "nothing crashes, it just never resolves" failure mode
-a missing `SafeAreaProvider` has. Mounted with no `deviceMotion` prop, it degrades the same way
-(with a one-time `console.warn` in dev, easy to notice if it's accidental).
+Everything else about orientation (`useOrientationState`, `FakeLandscapeView`, `rotateInsets` and the
+rest) is `@tastic/core`'s, imported from there. This package re-exported it under older names up to 0.5.5
+and no longer does: `useAccelerometerOrientation`, `getAccelerometerOrientationSnapshot` and
+`AccelerometerOrientationState` are core's `useOrientationState`, `getOrientationSnapshot` and
+`OrientationState`, and `FakeLandscapeView`, `rotateInsets`, `rotateDimensions` and the `ViewRotation`,
+`EdgeInsets`, `OrientationMode` and `FakeLandscapeViewProps` types keep their names in core. The rest of
+what it re-exported (`AccelerometerOrientationProvider`, which was core's `OrientationProvider`,
+`useRotation`, `useRotatedWindowDimensions`, `getViewRotation`, `getFixedZoneRotation` and
+`getOpposingZoneRotation`) is gone from core too, since 0.18: the OS turns the screen, so there's no
+drawn turn left to read.
 
 ## Usage: two-player zones that actually reflow (`DualZoneLayout`)
 
@@ -72,12 +49,9 @@ import { useOrientationState } from '@tastic/core'
 import { DualZoneLayout, useDualZoneLayout } from '@tastic/split-screen'
 
 function LobbyScreen() {
-  // orientationMode/p1OnRight/upsideDown are derived from the device's own physical tilt, not the
-  // OS's own rotation - this works even in an app permanently locked to portrait at the OS level,
-  // since there's no live window-shape signal left to read otherwise. `lockOrientationSetting`
-  // freezes all three at whatever they last committed, the same job an app-level "Lock Orientation"
-  // preference toggle already wants.
-  const { orientationMode, p1OnRight, upsideDown, resolved } = useOrientationState(lockOrientationSetting)
+  // The seat mode from the window's shape. Passing true freezes this call site at its current value
+  // (a round in progress, say).
+  const { orientationMode, p1OnRight, upsideDown, resolved } = useOrientationState()
 
   // panelLayout is the *committed* layout - lags one fade behind the live values above. Use it
   // (not the live orientationMode/p1OnRight) for anything else that needs to match what's actually
@@ -100,53 +74,61 @@ function LobbyScreen() {
 (face-to-face rotate-and-stack vs. side-by-side row). A solo screen (nothing to rotate for) doesn't
 need it at all - just render your own content.
 
-## Usage: content that must NOT reflow (`getViewRotation` / fixed zones)
+`useDualZoneLayout(orientationMode, p1OnRight, p1OnRightResolved, upsideDown = false, fadeDurationMs = 200)`
+returns `{ panelLayout, panelFadeStyle }`. `panelLayout` (`DualZoneLayoutState`: `{ orientationMode,
+p1OnRight, upsideDown }`) is the committed layout: a change fades the old layout out over
+`fadeDurationMs`, swaps it, then fades the new one in. While `p1OnRightResolved` is false nothing fades,
+so a fresh mount's first correction snaps straight to the right layout.
 
-Not everything can reflow. A game board (and its touch zones) usually needs to keep the exact same
-geometry regardless of which way the device is held - only the *decoration* on top of it (dialogs,
-countdowns, HUD chips) should rotate in place to stay legible. Three flavors, depending on what the
-content is:
+`DualZoneLayout`'s props:
 
-- **Single-perspective, whole-screen content** (a title screen, a settings dialog): wrap it in
-  `FakeLandscapeView`. This moved to [`@tastic/core`](https://github.com/jayrdeaton/react-native-game-core)
-  as of core 0.5.0 - it never had any real dependency on this package's own two-player pieces
-  (`DualZoneLayout` and friends), only on the rotation primitives that already lived in core. Still
-  re-exported here under its original name for backward compatibility (see the compat note in Setup
-  above); new code should import it directly from `@tastic/core` - see that package's own README for
-  the full usage example and its "safe for tap-driven content, not for continuous gesture tracking"
-  warning.
+- `panelLayout`, `panelFadeStyle`: from `useDualZoneLayout`.
+- `p1`, `p2`: each player's zone. Face to face, p2's zone is turned 180° and stacked above p1's; side
+  by side, the two sit in a plain row ordered by `p1OnRight`.
+- `shared` (optional): the row both players read right-side up, between the two zones face to face and
+  above the row side by side.
+- `p1Elevated`, `p2Elevated`, `sharedElevated` (optional): raise that zone above the others while a
+  popover inside it is open, so it can paint over a neighboring zone. Each zone is its own stacking
+  context on the web, so a popover's own `zIndex` can't reach across a zone boundary. They're
+  independent because both players can have something open at once.
 
-- **Two fixed zones that never reflow** (e.g. a game board permanently split top/bottom, one player
-  per half, regardless of tilt) - use `getFixedZoneRotation` for the first seat's rotation, and
-  `getOpposingZoneRotation` for the second seat's. The zones themselves stay exactly where they are;
-  only each seat's own dialog/HUD content rotates:
+### Zone bounds (`useZoneBounds`)
 
-  ```tsx
-  import { getFixedZoneRotation, getOpposingZoneRotation, useOrientationState } from '@tastic/core'
+Inside a `DualZoneLayout` zone, `useZoneBounds()` returns that zone's `ZoneBounds`, so a popover,
+dropdown or dialog anchored there can stay out of the shared row and the other player's half. It
+returns `null` outside a zone (in `shared`, on a solo screen, or before the shared row's first
+measurement lands), so a caller just skips its extra clamp until it resolves. `@tastic/hud`'s
+`useZoneClampedAlign` is built on it.
 
-  const { orientationMode, p1OnRight, upsideDown } = useOrientationState()
-  const rotation = getFixedZoneRotation(orientationMode, p1OnRight, upsideDown)
-  const p2Rotation = getOpposingZoneRotation(rotation)
+- `sharedEdgeY`: the window Y of the edge between this zone and the shared row (the same space as
+  `measureInWindow`, post-transform, so it's right from inside p2's turned zone too). Content anchored
+  in the zone must not cross it.
+- `zoneSide`: `'belowShared'` (p1 face to face, or either zone side by side) or `'aboveShared'` (p2 face
+  to face): which way from `sharedEdgeY` the zone lies. Only that direction is bounded by
+  `sharedEdgeY`; the other runs to the screen's own edge.
+- `rotated`: whether the zone is turned 180° in real-world terms, counting an enclosing
+  `FakeLandscapeView`'s upside-down turn as well as p2's own. Content placed with plain relative styles
+  (`top: '100%'`) inside a turned zone appears flipped, so a caller choosing a real-world direction
+  itself flips it for such a component.
 
-  <Text style={{ transform: [{ rotate: `${rotation}deg` }] }}>{p1Text}</Text>
-  <Text style={{ transform: [{ rotate: `${p2Rotation}deg` }] }}>{p2Text}</Text>
-  ```
+### Corners or a shared neutral zone (`needsSharedNeutralZone`)
 
-  Landscape rotates both seats identically - held side by side, they read the screen the same way
-  up. Portrait ignores the device's own "upside down" flip (the zones can't swap which physical seat
-  they're nearest just because the device spun while lying flat) and instead applies the two seats'
-  own fixed face-to-face 180° difference - `getFixedZoneRotation` deliberately never adds that flip
-  itself; `getOpposingZoneRotation` is what does, and only for the second seat.
+`needsSharedNeutralZone(orientationMode, humanPlayerCount)` is true when more than one human shares the
+device face to face: the one layout where a fixed corner can't be reached right-side up by both
+players, so shared actions belong in a vertically centered spot. Side by side, or with one human (vs
+CPU), plain corners work. It takes the already-resolved `orientationMode` and has no platform check of
+its own, so a narrow mobile-web window reads face to face like a phone.
 
-- **Safe-area insets**, once anything above has visually rotated - `rotateInsets(insets, rotation)`
-  remaps `useSafeAreaInsets()`'s always-physical-frame values onto whichever edge they actually
-  correspond to post-rotation.
+## Content that must not reflow
+
+A game board (and its touch zones) that keeps the same geometry however the device is held doesn't need
+`DualZoneLayout`. Player 2's face-to-face decoration (a dialog, a countdown, a HUD chip) is turned 180°
+in place (`@tastic/core`'s `FakeLandscapeView` or `toRotationStyle` with `180`), and
+`needsSharedNeutralZone` above says where shared actions go.
 
 ## Install
 
-Published to the public npm registry as `@tastic/split-screen`. Everything described above,
-including `FakeLandscapeView`'s move to `@tastic/core` (re-exported here for backward
-compatibility) and the `deviceMotion` injection pattern, is live on npm as of 0.5.0.
+Published to the public npm registry as `@tastic/split-screen`.
 
 ```bash
 npm install @tastic/split-screen
@@ -169,14 +151,11 @@ linked consumer at once.
 
 ## Peer dependencies
 
-`react`, `react-native`, `react-native-reanimated` (^4 - the fade transition), and
-[`@tastic/core`](https://github.com/jayrdeaton/react-native-game-core) (>=0.5.0 - the orientation-
-tracking foundation this package re-exports and builds its own zone layout on top of; the floor
-reflects `FakeLandscapeView`'s own move there, which this package's compat re-export needs), and
-[`@rific/core`](https://github.com/jayrdeaton/React-Native-Core) (>=0.5.0 - `useWorkletCallback`, which
-carries the fade's layout swap back to JS; `@tastic/core` already requires it). None of these are bundled, so use whatever versions your app already has.
-
-**Not a dependency: `expo-sensors`.** This package used to import it directly; that moved into
-`@tastic/core`, which never imports it either (see its own README for why) - your app hands in its
-own `expo-sensors` import via the `deviceMotion` prop on `AccelerometerOrientationProvider` (see
-Setup above) if it wants live tilt tracking.
+`react` (>=19.0.0), `react-native` (>=0.76.0), `react-native-reanimated` (>=4.0.0 - the fade
+transition), `react-native-worklets` (>=0.5.0 - `scheduleOnRN`, which the fade's reaction calls back to
+JS with), [`@tastic/core`](https://github.com/jayrdeaton/react-native-game-core) (>=0.5.0 - only the
+`OrientationMode` type that `useDualZoneLayout` and `needsSharedNeutralZone` take; an app reads the seat
+mode itself with core's `useOrientationState`), and
+[`@rific/core`](https://github.com/jayrdeaton/React-Native-Core) (>=0.5.0 - `useWorkletCallback` and
+`callWorkletCallback`, which carry the fade's layout swap back to JS). None of them is optional, and
+none is bundled, so use whatever versions your app already has.

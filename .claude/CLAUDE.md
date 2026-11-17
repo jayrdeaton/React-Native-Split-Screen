@@ -10,8 +10,9 @@ physical side each player lands on, and the fade transition between them.
 
 Published under the `tastic` npm org - game-specific layout, as opposed to `@rific`'s generic
 React Native tooling. Sibling package: `@tastic/hud` (`../React-Native-Hud`), the popover/dropdown/
-gauge/dialog kit whose components render correctly inside this package's 180°-rotated zone. Neither
-package depends on the other - they compose at the consuming app's own screen.
+gauge/dialog kit whose components render correctly inside this package's 180°-rotated zone. This
+package never imports hud; hud imports this one only for `useZoneBounds` (behind its
+`useZoneClampedAlign`, an optional peer there). They compose at the consuming app's own screen.
 
 ## Commands
 
@@ -84,13 +85,9 @@ Enforced by ESLint + Prettier - run the linter before finishing any task.
 
 | File | Purpose |
 |---|---|
-| `types.ts` | `OrientationMode` (`'faceToFace' \| 'sideBySide'`) - split into its own file since it's shared by `useAccelerometerOrientation.tsx` and `useDualZoneLayout.ts` and neither should import from the other. |
-| `useAccelerometerOrientation.tsx` | `orientationMode`/`p1OnRight`/`upsideDown`, derived from the device's own physical tilt via `expo-sensors`' `DeviceMotion` rather than `useWindowDimensions`/`expo-screen-orientation` - works even when the consuming app is permanently locked to portrait at the OS level, since there's no live window-shape signal left to read otherwise. Debounces against brief jolts (e.g. a swipe) and simply holds its last committed value once the phone goes flat/ambiguous (gravity gives no signal about in-plane rotation there at all). `locked` freezes all three fields at whatever they last committed - the same job the old `useOrientationLock`'s `enabled` flag did, just local to this hook now instead of a native call. `AccelerometerOrientationProvider` hoists the actual sensor subscription to one app-lifetime instance (mount once, near the root) so the committed reading survives screen navigation; `useAccelerometerOrientation` reads it via Context. `getAccelerometerOrientationSnapshot()` is a non-subscribing one-time read (e.g. to seed a lazy `useState` initializer) for a caller that must never re-render just because the phone moved - plain `useContext` can't do this, since subscribing at all re-renders the caller on every future update regardless of whether it goes on to use the new value. |
-| `rotation.ts` | `getViewRotation(orientationMode, p1OnRight, upsideDown)` - the raw rotation angle (0/90/180/-90) for single-perspective content (`FakeLandscapeView` reads this internally). `getFixedZoneRotation` is the same idea for a permanently fixed two-zone layout (e.g. a game board that never reflows): only a genuine landscape hold rotates anything; portrait's "upside down" flip is deliberately ignored, since the zones can't swap which physical seat they're nearest just by spinning while flat. `getOpposingZoneRotation` gives the *second* seat's own rotation from the first seat's - identical in landscape (both seats face the same way), +180°/-180° apart in portrait (the seats are face-to-face). |
-| `insets.ts` | `rotateInsets(insets, rotation)` - remaps `useSafeAreaInsets()`'s always-physical-frame values onto whichever edge they actually correspond to once content has visually rotated. |
-| `FakeLandscapeView.tsx` | Wraps whole-screen, single-perspective content in whatever rotation (via `getViewRotation`) keeps it gravity-upright - width/height swap for a genuine 90°/-90° hold, plain rotate for 180°. NOT safe for continuous gesture tracking (raw native coordinates don't rotate with it) - never wrap a game board/touch layer in this. |
+| `actionZone.ts` | `needsSharedNeutralZone(orientationMode, humanPlayerCount)`: whether shared actions need a vertically centered spot (two humans face to face) or can sit in corners. |
 | `useDualZoneLayout.ts` | The committed (not live) layout state plus a Reanimated opacity style - fades out, swaps content, fades in across a rotation, rather than snapping instantly. Returns `panelLayout` so a caller can also size other things (e.g. a press-away zone rect) against the same painted state. |
-| `DualZoneLayout.tsx` | Renders `p1`/`p2`/`shared` in whichever arrangement `panelLayout` calls for - face-to-face (p2 rotated 180° and stacked) or side-by-side (plain left/right row) - driven by `useDualZoneLayout`'s state and fade style. Only covers the two-player, reflowing case; a solo screen, or a board whose zones must stay fixed (see `rotation.ts`), doesn't need this component. |
+| `DualZoneLayout.tsx` | Renders `p1`/`p2`/`shared` in whichever arrangement `panelLayout` calls for - face-to-face (p2 rotated 180° and stacked) or side-by-side (plain left/right row) - driven by `useDualZoneLayout`'s state and fade style. Only covers the two-player, reflowing case; a solo screen, or a board whose zones must stay fixed, doesn't need this component. |
 | `useZoneBounds.ts` | Context carrying the currently-rendered `DualZoneLayout` zone's own bounds/rotation state (`sharedEdgeY`, `zoneSide`, `rotated`) down to consumers inside it - e.g. `@tastic/hud` popovers that need to clamp against the shared row or account for a 180°-rotated zone's locally-inverted positioning. `null` outside a zone. |
 | `index.ts` | Public exports. |
 
@@ -107,15 +104,18 @@ the same `panelLayout` without the app re-deriving it twice.
 The complete `src/index.ts` export list:
 
 ```ts
+export { needsSharedNeutralZone } from './actionZone'
 export { DualZoneLayout } from './DualZoneLayout'
-export { FakeLandscapeView, type FakeLandscapeViewProps } from './FakeLandscapeView'
-export { type EdgeInsets, rotateInsets } from './insets'
-export { getFixedZoneRotation, getOpposingZoneRotation, getViewRotation, type ViewRotation } from './rotation'
-export { type OrientationMode } from './types'
-export { AccelerometerOrientationProvider, type AccelerometerOrientationState, getAccelerometerOrientationSnapshot, useAccelerometerOrientation } from './useAccelerometerOrientation'
 export { type DualZoneLayoutState, useDualZoneLayout } from './useDualZoneLayout'
 export { useZoneBounds, type ZoneBounds } from './useZoneBounds'
 ```
+
+The orientation reading and rotation math (`useOrientationState`, `OrientationProvider`,
+`FakeLandscapeView`, `getViewRotation`, `rotateInsets` and the rest) moved to `@tastic/core` in 0.4.0
+and 0.5.0, and this package re-exported them under their old names (`AccelerometerOrientationProvider`,
+`useAccelerometerOrientation`, ...) through 0.5.5. The re-exports were dropped on 2026-11-17 (Jay: no
+backward-compatibility paths); no app in `~/Developer` imported any of them from here. The only thing
+left from core is the `OrientationMode` type, imported with `import type`.
 
 `ZoneBoundsProvider` (also exported from `useZoneBounds.ts`) is deliberately NOT re-exported here -
 it's an internal wiring detail `DualZoneLayout.tsx` imports directly; consumers only ever read bounds
@@ -125,7 +125,9 @@ via `useZoneBounds`, never provide them.
 
 - `react` >=19.0.0, `react-native` >=0.76.0
 - `react-native-reanimated` >=4.0.0 - the fade transition (`useAnimatedReaction`, `withTiming`, shared values)
-- `expo-sensors` >=57.0.0 - `DeviceMotion` tilt reading
+- `react-native-worklets` >=0.5.0 - `scheduleOnRN`, the fade's reaction calling back to JS
+- `@rific/core` >=0.5.0 - `useWorkletCallback`/`callWorkletCallback`, carrying the fade's layout swap back to JS
+- `@tastic/core` >=0.5.0 - the `OrientationMode` type only
 
 No `react-native-gesture-handler`, no `react-native-paper`.
 
@@ -135,9 +137,7 @@ No `react-native-gesture-handler`, no `react-native-paper`.
   (jsdom environment; ts-jest transform under the hood, resolved transitively through the preset -
   not a direct devDependency here) + `@testing-library/react`
 - **Location:** `src/__tests__/*.test.ts` and `*.test.tsx`
-- **Mocks:** `src/__mocks__/` - `react-native`, `react-native-reanimated`, `expo-sensors`
-- **Current:** 7 suites / 38 tests, all passing. Coverage: 92.9% stmts / 87.17% branches / 89.28% funcs
-  / 94.3% lines - clears the shared preset's 70%/70%/70%/70% default on every metric, so
-  `jest.config.cjs` carries no local `coverageThreshold` override
-- Tests cover the state hooks (`useAccelerometerOrientation`, `useDualZoneLayout`, `useZoneBounds`), the pure rotation/insets math (`rotation.ts`, `insets.ts`), and component rendering (`DualZoneLayout.tsx`, `FakeLandscapeView.tsx` - both now at 100%). Neither the mocked `View` nor the mocked `Animated.View` produces real host DOM elements, so these tests assert against props recorded on the `View` mock (`View.mock.calls`) and rendered text order/content rather than DOM structure. `src/__mocks__/react-native.ts`'s `View` stub also honors an incoming `ref` prop - React 19's ref-as-prop for a plain, non-`forwardRef` function component - handing back a fake `measureInWindow`, which is what lets `DualZoneLayout.test.tsx` exercise the post-measurement `ZoneBounds` branches instead of leaving them permanently unreachable
-- When adding new hook or rotation-math behavior, add a corresponding test case
+- **Mocks:** `src/__mocks__/` - `react-native`, `react-native-reanimated`, `react-native-worklets`. `@tastic/core` needs no mock: only its type is imported
+- **Current:** 4 suites / 24 tests, all passing
+- Tests cover the state hooks (`useDualZoneLayout`, `useZoneBounds`), `needsSharedNeutralZone`, and `DualZoneLayout.tsx`'s rendering. Neither the mocked `View` nor the mocked `Animated.View` produces real host DOM elements, so these tests assert against props recorded on the `View` mock (`View.mock.calls`) and rendered text order/content rather than DOM structure. `src/__mocks__/react-native.ts`'s `View` stub also honors an incoming `ref` prop - React 19's ref-as-prop for a plain, non-`forwardRef` function component - handing back a fake `measureInWindow`, which is what lets `DualZoneLayout.test.tsx` exercise the post-measurement `ZoneBounds` branches instead of leaving them permanently unreachable
+- When adding new hook or layout behavior, add a corresponding test case

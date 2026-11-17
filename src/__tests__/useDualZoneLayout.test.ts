@@ -1,4 +1,4 @@
-import { OrientationMode } from '@tastic/core'
+import type { OrientationMode } from '@tastic/core'
 import { renderHook } from '@testing-library/react'
 
 import { useDualZoneLayout } from '../useDualZoneLayout'
