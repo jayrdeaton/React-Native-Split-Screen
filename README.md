@@ -159,3 +159,7 @@ mode itself with core's `useOrientationState`), and
 [`@rific/core`](https://github.com/jayrdeaton/React-Native-Core) (>=0.5.0 - `useWorkletCallback` and
 `callWorkletCallback`, which carry the fade's layout swap back to JS). None of them is optional, and
 none is bundled, so use whatever versions your app already has.
+
+---
+
+Made by [Infinite Token](https://www.infinitetoken.com), the team behind [Lumber](https://lumber.infinitetoken.com): end-to-end encrypted logging.
